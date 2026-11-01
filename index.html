@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>風之工程師 V2 - 海陸風大解密</title>
+<title>風之工程師 V3 - 海陸風大解密</title>
 <style>
   /* 基礎設定，針對 iPad 觸控優化 */
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
@@ -34,14 +34,15 @@
   .sun { 
     position: absolute; top: 10%; left: 15%; width: 80px; height: 80px; 
     background: #FFD166; border-radius: 50%; box-shadow: 0 0 30px #FFD166; 
-    transition: all 1s; cursor: pointer; z-index: 10;
+    transition: all 0.5s; cursor: pointer; z-index: 50;
+    display: flex; justify-content: center; align-items: center; font-size: 30px;
   }
   .sun.hot { background: #FF5722; box-shadow: 0 0 60px #FF5722; transform: scale(1.1); }
-  .land { position: absolute; bottom: 0; left: 0; width: 55%; height: 45%; background: #8BC34A; border-top-right-radius: 80% 100%; }
-  .ocean { position: absolute; bottom: 0; right: 0; width: 50%; height: 35%; background: #4FC3F7; border-top-left-radius: 80% 100%; }
-  .lighthouse { position: absolute; bottom: 42%; left: 48%; width: 30px; height: 80px; background: white; border: 2px solid #ccc; border-radius: 5px 5px 0 0; z-index: 5; }
+  .land { position: absolute; bottom: 0; left: 0; width: 55%; height: 45%; background: #8BC34A; border-top-right-radius: 80% 100%; pointer-events: none; }
+  .ocean { position: absolute; bottom: 0; right: 0; width: 50%; height: 35%; background: #4FC3F7; border-top-left-radius: 80% 100%; pointer-events: none; }
+  .lighthouse { position: absolute; bottom: 42%; left: 48%; width: 30px; height: 80px; background: white; border: 2px solid #ccc; border-radius: 5px 5px 0 0; z-index: 5; pointer-events: none; }
   .lighthouse::before { content:''; position: absolute; top: -15px; left: -5px; width: 40px; height: 15px; background: #FFB703; border-radius: 50% 50% 0 0; }
-  .tree { position: absolute; bottom: 40%; width: 40px; height: 60px; background: #2E7D32; border-radius: 50% 50% 20% 20%; transition: transform 0.2s; z-index: 5; }
+  .tree { position: absolute; bottom: 40%; width: 40px; height: 60px; background: #2E7D32; border-radius: 50% 50% 20% 20%; transition: transform 0.2s; z-index: 5; pointer-events: none; }
   .tree::after { content:''; position: absolute; bottom: -15px; left: 15px; width: 10px; height: 15px; background: #795548; }
   .tree.t1 { left: 10%; }
   .tree.t2 { left: 22%; height: 70px; bottom: 41%; }
@@ -53,15 +54,15 @@
     position: absolute; top: 12%; left: 50%; transform: translateX(-50%);
     background: rgba(255,255,255,0.95); padding: 15px 30px; border-radius: 20px;
     font-size: 22px; font-weight: bold; color: #023047; box-shadow: 0 6px 15px rgba(0,0,0,0.15);
-    text-align: center; z-index: 50; transition: all 0.3s; border: 3px solid #219EBC;
-    min-width: 300px;
+    text-align: center; z-index: 200; transition: all 0.3s; border: 3px solid #219EBC;
+    min-width: 300px; pointer-events: none; /* 唔好阻擋點擊 */
   }
 
   /* 按鈕 */
   .btn {
     padding: 15px 40px; font-size: 24px; font-weight: bold; border: none; border-radius: 30px;
     background: #FB8500; color: white; box-shadow: 0 6px #d67000; cursor: pointer;
-    transition: transform 0.1s, box-shadow 0.1s; outline: none;
+    transition: transform 0.1s, box-shadow 0.1s; outline: none; pointer-events: auto;
   }
   .btn:active { transform: translateY(4px); box-shadow: 0 2px #d67000; }
   .btn-blue { background: #219EBC; box-shadow: 0 6px #176b80; }
@@ -70,19 +71,18 @@
   .btn-green:active { box-shadow: 0 2px #388E3C; }
 
   /* 階段控制 */
-  .stage { display: none; position: absolute; width: 100%; height: 100%; z-index: 20; }
+  .stage { display: none; position: absolute; width: 100%; height: 100%; z-index: 20; pointer-events: none; }
   .stage.active { display: block; }
 
   /* 階段一 UI */
-  #stage1 .controls { position: absolute; bottom: 15%; left: 25%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 30; }
+  #stage1 .controls { position: absolute; bottom: 15%; left: 25%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 150; pointer-events: auto; }
   
-  /* 階段二 UI (Canvas) */
-  #stage2 { z-index: 30; }
-  #draw-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 25; }
+  /* 階段二 UI (Canvas 畫線) */
+  #draw-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; pointer-events: auto; touch-action: none; }
   .pressure-icon {
     position: absolute; width: 60px; height: 60px; border-radius: 50%; display: flex;
     justify-content: center; align-items: center; font-size: 36px; font-weight: bold;
-    color: white; opacity: 0; transition: opacity 0.5s; z-index: 26; pointer-events: none;
+    color: white; opacity: 0; transition: opacity 0.5s; z-index: 101; pointer-events: none;
   }
   .pressure-icon.low { background: #E63946; top: 35%; left: 20%; }
   .pressure-icon.high { background: #023047; top: 60%; right: 15%; }
@@ -90,14 +90,15 @@
   /* 階段三 UI */
   #stage3 .quiz-panel {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    background: white; padding: 40px; border-radius: 25px; width: 90%; max-width: 850px;
-    box-shadow: 0 15px 40px rgba(0,0,0,0.3); z-index: 40; text-align: center;
-    display: none; flex-direction: column; gap: 25px; border: 5px solid #219EBC;
+    background: white; padding: 30px; border-radius: 25px; width: 90%; max-width: 850px;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.3); z-index: 150; text-align: center;
+    display: none; flex-direction: column; gap: 20px; border: 5px solid #219EBC;
+    pointer-events: auto;
   }
   #stage3 .quiz-panel.active { display: flex; }
-  .quiz-text { font-size: 26px; line-height: 2.2; color: #333; text-align: left; }
+  .quiz-text { font-size: 24px; line-height: 2.2; color: #333; text-align: left; }
   .blank {
-    display: inline-block; min-width: 120px; padding: 5px 15px; margin: 0 5px;
+    display: inline-block; min-width: 100px; padding: 5px 15px; margin: 0 5px;
     border-bottom: 4px dashed #219EBC; color: #FB8500; font-weight: bold; text-align: center;
     background: #e0fbfc; border-radius: 8px; cursor: pointer; transition: all 0.2s;
   }
@@ -105,14 +106,17 @@
   .blank.correct { background: #C8E6C9; color: #2E7D32; border-bottom-color: #2E7D32; border-bottom-style: solid; }
   .blank.wrong { background: #FFCDD2; color: #B71C1C; border-bottom-color: #B71C1C; border-bottom-style: solid; }
   
-  .options { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 10px; }
+  .options { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-top: 10px; }
   .option-btn {
-    padding: 15px 35px; font-size: 24px; background: #f8f9fa; border: 3px solid #adb5bd;
+    padding: 15px 30px; font-size: 22px; background: #f8f9fa; border: 3px solid #adb5bd;
     border-radius: 15px; color: #495057; font-weight: bold; cursor: pointer;
     transition: all 0.2s; box-shadow: 0 4px #adb5bd;
   }
   .option-btn:active { transform: translateY(2px); box-shadow: 0 2px #adb5bd; }
   .option-btn:hover { border-color: #219EBC; color: #219EBC; }
+
+  /* 粒子層 */
+  #particle-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -120,7 +124,7 @@
 <div id="game-container">
   <!-- 背景場景 -->
   <div class="scene">
-    <div class="sun" id="sun"></div>
+    <div class="sun" id="sun">☀️</div>
     <div class="land"></div>
     <div class="ocean"></div>
     <div class="lighthouse"></div>
@@ -130,19 +134,19 @@
 
   <!-- 頂部狀態 -->
   <div id="header">
-    <div>🌍 風之工程師 V2</div>
+    <div>🌍 風之工程師 V3</div>
     <div id="status-text">任務：點擊太陽加熱陸地</div>
   </div>
+
+  <!-- 粒子層 -->
+  <canvas id="particle-canvas"></canvas>
 
   <!-- 提示對話框 -->
   <div class="dialog-box" id="dialog">點擊左上角的太陽，讓陸地受熱！</div>
 
-  <!-- 粒子層 -->
-  <canvas id="particle-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:15; pointer-events:none;"></canvas>
-
   <!-- 階段一：熱空氣 -->
   <div class="stage active" id="stage1">
-    <div class="controls">
+    <div class="controls" id="stage1-controls" style="display: none;">
       <button class="btn" id="btn-expand">膨脹</button>
       <button class="btn btn-blue" id="btn-contract">收縮</button>
     </div>
@@ -177,58 +181,56 @@
 
 <script>
 /* 
-  V2 改善重點：
-  1. 使用 Canvas 進行粒子與畫線動畫，iPad 觸控更流暢。
-  2. 粒子動畫嚴格遵守「距離拉開」而非「體積變大」。
-  3. 階段三填空互動優化，點擊空格再選答案，並加入視覺回饋。
-  4. 加入 Web Audio API 音效。
+  V3 修正重點：
+  1. 修正音效初始化時機 (解決 iOS Safari 卡死問題)。
+  2. 改用 Pointer Events (pointerdown, pointermove, pointerup) 取代 touch/mouse 混合。
+  3. 強制設定 canvas 寬高與 devicePixelRatio 匹配，解決 Retina 螢幕點擊位置偏移。
+  4. 簡化部分 DOM 結構與 z-index 層級，確保按鈕一定可以被點擊。
 */
 
-// --- 音效產生器 (無需外部檔案) ---
-const AudioContext = window.AudioContext || window.webkitAudioContext;
-let audioCtx;
-function initAudio() {
-  if (!audioCtx) audioCtx = new AudioContext();
-}
+// --- 音效產生器 (安全版本) ---
+let audioCtx = null;
 function playSound(type) {
-  if (!audioCtx) return;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  
-  if (type === 'click') {
-    osc.type = 'sine'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-  } else if (type === 'success') {
-    osc.type = 'triangle'; 
-    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.2);
-    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
-  } else if (type === 'error') {
-    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.2);
-  } else if (type === 'wind') {
-    // 簡單的白噪音模擬風聲
-    const bufferSize = audioCtx.sampleRate * 1.5; 
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-    const noise = audioCtx.createBufferSource();
-    noise.buffer = buffer;
-    const filter = audioCtx.createBiquadFilter();
-    filter.type = 'lowpass'; filter.frequency.value = 800;
-    noise.connect(filter); filter.connect(gain);
-    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
-    noise.start(); noise.stop(audioCtx.currentTime + 1.5);
+  // 如果沒有 AudioContext，嘗試初始化
+  if (!audioCtx) {
+    try {
+      window.AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContext();
+    } catch (e) {
+      console.log("瀏覽器不支援音效");
+      return;
+    }
   }
+  // 如果被瀏覽器暫停，嘗試恢復
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    if (type === 'click') {
+      osc.type = 'sine'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+    } else if (type === 'success') {
+      osc.type = 'triangle'; 
+      osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+    } else if (type === 'error') {
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+    }
+  } catch(e) { console.log("音效播放失敗", e); }
 }
 
 // --- 全局狀態 ---
@@ -250,6 +252,7 @@ const btnContract = document.getElementById('btn-contract');
 const stage1 = document.getElementById('stage1');
 const stage2 = document.getElementById('stage2');
 const stage3 = document.getElementById('stage3');
+const stage1Controls = document.getElementById('stage1-controls');
 const drawCanvas = document.getElementById('draw-canvas');
 const ctxDraw = drawCanvas.getContext('2d');
 const particleCanvas = document.getElementById('particle-canvas');
@@ -261,61 +264,79 @@ const quizPanel = document.getElementById('quiz-panel');
 const optionsContainer = document.getElementById('options-container');
 const btnCheck = document.getElementById('btn-check');
 
-// 初始化 Canvas 尺寸
+// --- 初始化 Canvas (解決 Retina 螢幕問題) ---
 function resizeCanvas() {
-  particleCanvas.width = window.innerWidth;
-  particleCanvas.height = window.innerHeight;
-  drawCanvas.width = window.innerWidth;
-  drawCanvas.height = window.innerHeight;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = document.getElementById('game-container').getBoundingClientRect();
+  
+  // 粒子 Canvas
+  particleCanvas.width = rect.width * dpr;
+  particleCanvas.height = rect.height * dpr;
+  ctxPart.scale(dpr, dpr);
+  
+  // 畫線 Canvas
+  drawCanvas.width = rect.width * dpr;
+  drawCanvas.height = rect.height * dpr;
+  ctxDraw.scale(dpr, dpr);
+  
+  // 如果已經有粒子，重新繪製
+  if (state.particles.length > 0) drawParticles();
 }
 window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 200));
 resizeCanvas();
 
-// --- 粒子系統 (Stage 1 & 2) ---
+// --- 粒子系統 ---
 function createParticles() {
   state.particles = [];
-  const startX = window.innerWidth * 0.25; // 陸地中心
-  const startY = window.innerHeight * 0.6;  // 陸地上方
+  const rect = document.getElementById('game-container').getBoundingClientRect();
+  const startX = rect.width * 0.25; 
+  const startY = rect.height * 0.6;  
   
-  for (let i = 0; i < 40; i++) {
-    // 初始密集狀態
-    let x = startX + (Math.random() - 0.5) * 100;
-    let y = startY + (Math.random() - 0.5) * 80;
+  for (let i = 0; i < 35; i++) {
+    let x = startX + (Math.random() - 0.5) * 80;
+    let y = startY + (Math.random() - 0.5) * 60;
     state.particles.push({
       x: x, y: y,
-      baseX: x, baseY: y,
+      targetX: x, targetY: y,
       radius: 6,
       color: '#FF5722',
-      vx: 0, vy: 0
+      vx: 0, vy: 0,
+      isMoving: false
     });
   }
 }
 
 function drawParticles() {
-  ctxPart.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+  const dpr = window.devicePixelRatio || 1;
+  ctxPart.clearRect(0, 0, particleCanvas.width / dpr, particleCanvas.height / dpr);
+  
   state.particles.forEach(p => {
     ctxPart.beginPath();
     ctxPart.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
     ctxPart.fillStyle = p.color;
     ctxPart.fill();
-    // 加點發光效果
-    ctxPart.shadowBlur = 10;
-    ctxPart.shadowColor = p.color;
   });
-  ctxPart.shadowBlur = 0;
 }
 
 function animateParticles() {
   let needsRedraw = false;
   state.particles.forEach(p => {
-    if (p.vx !== 0 || p.vy !== 0) {
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vx *= 0.95; // 摩擦力
-      p.vy *= 0.95;
-      if (Math.abs(p.vx) > 0.1 || Math.abs(p.vy) > 0.1) needsRedraw = true;
+    if (p.isMoving) {
+      // 緩動移動
+      p.x += (p.targetX - p.x) * 0.08;
+      p.y += (p.targetY - p.y) * 0.08;
+      
+      if (Math.abs(p.targetX - p.x) > 0.5 || Math.abs(p.targetY - p.y) > 0.5) {
+        needsRedraw = true;
+      } else {
+        p.x = p.targetX;
+        p.y = p.targetY;
+        p.isMoving = false;
+      }
     }
   });
+  
   if (needsRedraw) {
     drawParticles();
     state.animId = requestAnimationFrame(animateParticles);
@@ -325,77 +346,62 @@ function animateParticles() {
 }
 
 // --- 階段一邏輯 ---
-sun.addEventListener('click', () => {
+sun.addEventListener('pointerdown', (e) => {
+  e.preventDefault(); // 防止雙擊縮放
   if (state.stage !== 1 || state.sunHot) return;
-  initAudio(); playSound('click');
   
+  playSound('click');
   state.sunHot = true;
   sun.classList.add('hot');
   dialog.innerText = '陸地受熱了！空氣會怎樣呢？';
   statusText.innerText = '任務：選擇空氣的變化';
-  btnExpand.style.display = 'inline-block';
-  btnContract.style.display = 'inline-block';
+  stage1Controls.style.display = 'flex';
 
-  // 粒子震動效果 (受熱)
+  // 粒子震動效果 (模擬受熱)
   state.particles.forEach(p => {
-    p.vx = (Math.random() - 0.5) * 15;
-    p.vy = (Math.random() - 0.5) * 15;
+    p.targetX = p.x + (Math.random() - 0.5) * 30;
+    p.targetY = p.y + (Math.random() - 0.5) * 30;
+    p.isMoving = true;
   });
   cancelAnimationFrame(state.animId);
   animateParticles();
 });
 
-btnExpand.addEventListener('click', () => {
+btnExpand.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
   if (!state.sunHot) return;
   playSound('success');
-  btnExpand.style.display = 'none';
-  btnContract.style.display = 'none';
+  stage1Controls.style.display = 'none';
   dialog.innerText = '空氣受熱膨脹，粒子距離拉開，整體體積變大！';
   statusText.innerText = '觀察：熱空氣上升中';
   
   // 動畫：粒子距離拉開並整體上升
   state.particles.forEach(p => {
-    // 計算從中心向外擴散的方向
     let dx = p.x - (window.innerWidth * 0.25);
     let dy = p.y - (window.innerHeight * 0.6);
     let dist = Math.sqrt(dx*dx + dy*dy) || 1;
     
-    // 設定目標位置：向外擴散，並向上移動
-    let targetX = p.x + (dx / dist) * (60 + Math.random() * 40);
-    let targetY = p.y + (dy / dist) * (60 + Math.random() * 40) - 250; // 向上移動
-
-    // 使用動畫過渡
-    let startX = p.x, startY = p.y;
-    let startTime = performance.now();
-    let duration = 1500;
-
-    function update() {
-      let time = performance.now() - startTime;
-      let progress = Math.min(time / duration, 1);
-      // 緩動函數 easeOutQuad
-      let ease = 1 - (1 - progress) * (1 - progress);
-      
-      p.x = startX + (targetX - startX) * ease;
-      p.y = startY + (targetY - startY) * ease;
-      drawParticles();
-
-      if (progress < 1) {
-        requestAnimationFrame(update);
-      } else if (p === state.particles[state.particles.length - 1]) {
-        // 最後一個粒子移動完畢
-        setTimeout(startStage2, 500);
-      }
-    }
-    requestAnimationFrame(update);
+    // 目標位置：向外擴散，並向上移動
+    p.targetX = p.x + (dx / dist) * (80 + Math.random() * 60);
+    p.targetY = p.y + (dy / dist) * (80 + Math.random() * 60) - 300;
+    p.isMoving = true;
   });
+  
+  cancelAnimationFrame(state.animId);
+  animateParticles();
   
   // 確保粒子顏色變淡(上升)
   setTimeout(() => {
-    state.particles.forEach(p => p.color = 'rgba(255, 87, 34, 0.5)');
+    state.particles.forEach(p => p.color = 'rgba(255, 87, 34, 0.3)');
+    drawParticles();
   }, 800);
+
+  // 進入下一階段
+  setTimeout(startStage2, 2000);
 });
 
-btnContract.addEventListener('click', () => {
+btnContract.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
   playSound('error');
   dialog.innerText = '不對喔！空氣受熱時，粒子會拉開距離膨脹，再試一次！';
   btnContract.style.transform = 'translateX(5px)';
@@ -418,30 +424,23 @@ function startStage2() {
   lowPress.style.opacity = '1';
   highPress.style.opacity = '1';
   
-  // 清空粒子畫布，準備接收冷空氣
+  // 清空粒子畫布
   state.particles = [];
   ctxPart.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
 
-  // 綁定觸控事件
-  drawCanvas.style.pointerEvents = 'auto'; // 允許Canvas接收觸控
-  drawCanvas.addEventListener('touchstart', onPointerDown, {passive: false});
-  drawCanvas.addEventListener('touchmove', onPointerMove, {passive: false});
-  drawCanvas.addEventListener('touchend', onPointerUp);
-  drawCanvas.addEventListener('mousedown', onPointerDown);
-  drawCanvas.addEventListener('mousemove', onPointerMove);
-  drawCanvas.addEventListener('mouseup', onPointerUp);
+  // 綁定 Pointer Events (兼容 iPad 觸控與滑鼠)
+  drawCanvas.addEventListener('pointerdown', onPointerDown);
+  drawCanvas.addEventListener('pointermove', onPointerMove);
+  drawCanvas.addEventListener('pointerup', onPointerUp);
+  drawCanvas.addEventListener('pointercancel', onPointerUp);
 }
 
 function getPos(e) {
-  let clientX, clientY;
-  if (e.touches && e.touches.length > 0) {
-    clientX = e.touches[0].clientX;
-    clientY = e.touches[0].clientY;
-  } else {
-    clientX = e.clientX;
-    clientY = e.clientY;
-  }
-  return { x: clientX, y: clientY };
+  const rect = drawCanvas.getBoundingClientRect();
+  return { 
+    x: e.clientX - rect.left, 
+    y: e.clientY - rect.top 
+  };
 }
 
 function onPointerDown(e) {
@@ -473,7 +472,7 @@ function onPointerUp(e) {
   
   // 判斷成功條件：向左劃動超過 150px，且結束位置在左半邊
   if (pos.x < startX - 150 && pos.x < window.innerWidth * 0.45) {
-    playSound('wind');
+    playSound('success');
     // 成功！
     removePointerEvents();
     ctxDraw.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
@@ -489,7 +488,8 @@ function onPointerUp(e) {
 }
 
 function drawLine() {
-  ctxDraw.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  const dpr = window.devicePixelRatio || 1;
+  ctxDraw.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
   if (!currentLine) return;
   
   ctxDraw.beginPath();
@@ -514,56 +514,35 @@ function drawLine() {
 }
 
 function removePointerEvents() {
-  drawCanvas.removeEventListener('touchstart', onPointerDown);
-  drawCanvas.removeEventListener('touchmove', onPointerMove);
-  drawCanvas.removeEventListener('touchend', onPointerUp);
-  drawCanvas.removeEventListener('mousedown', onPointerDown);
-  drawCanvas.removeEventListener('mousemove', onPointerMove);
-  drawCanvas.removeEventListener('mouseup', onPointerUp);
-  drawCanvas.style.pointerEvents = 'none';
+  drawCanvas.removeEventListener('pointerdown', onPointerDown);
+  drawCanvas.removeEventListener('pointermove', onPointerMove);
+  drawCanvas.removeEventListener('pointerup', onPointerUp);
+  drawCanvas.removeEventListener('pointercancel', onPointerUp);
 }
 
 function successStage2() {
-  // 隱藏氣壓圖示
   lowPress.style.opacity = '0';
   highPress.style.opacity = '0';
   
   // 生成冷空氣粒子從右向左移動
-  for (let i = 0; i < 30; i++) {
-    let startX = window.innerWidth * 0.8 + (Math.random() - 0.5) * 100;
-    let startY = window.innerHeight * 0.5 + (Math.random() - 0.5) * 100;
-    let targetX = window.innerWidth * 0.25 + (Math.random() - 0.5) * 100;
-    let targetY = window.innerHeight * 0.6 + (Math.random() - 0.5) * 100;
+  const rect = document.getElementById('game-container').getBoundingClientRect();
+  for (let i = 0; i < 25; i++) {
+    let startX = rect.width * 0.8 + (Math.random() - 0.5) * 100;
+    let startY = rect.height * 0.5 + (Math.random() - 0.5) * 100;
+    let targetX = rect.width * 0.25 + (Math.random() - 0.5) * 100;
+    let targetY = rect.height * 0.6 + (Math.random() - 0.5) * 100;
     
     let p = {
       x: startX, y: startY, targetX: targetX, targetY: targetY,
-      radius: 6, color: '#00B4D8', progress: 0
+      radius: 6, color: '#00B4D8'
     };
     
-    // 使用動畫
-    let startTime = performance.now() + i * 40;
-    let duration = 800;
-    
-    function update() {
-      let time = performance.now() - startTime;
-      if (time < 0) { requestAnimationFrame(update); return; }
-      
-      let progress = Math.min(time / duration, 1);
-      let ease = 1 - Math.pow(1 - progress, 3); // easeOutCubic
-      
-      p.x = startX + (targetX - startX) * ease;
-      p.y = startY + (targetY - startY) * ease;
-      
-      ctxPart.beginPath();
-      ctxPart.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-      ctxPart.fillStyle = p.color;
-      ctxPart.fill();
-      
-      if (progress < 1) {
-        requestAnimationFrame(update);
-      }
-    }
-    requestAnimationFrame(update);
+    // 使用動畫 (簡單 setTimeout 控制延遲)
+    let delay = i * 40;
+    setTimeout(() => {
+      state.particles.push(p);
+      animateColdParticle(p);
+    }, delay);
   }
 
   // 樹木搖擺 (風的視覺回饋)
@@ -578,6 +557,28 @@ function successStage2() {
   }, 2500);
 }
 
+function animateColdParticle(p) {
+  let startTime = performance.now();
+  let duration = 800;
+  let startX = p.x, startY = p.y;
+  
+  function update() {
+    let time = performance.now() - startTime;
+    let progress = Math.min(time / duration, 1);
+    let ease = 1 - Math.pow(1 - progress, 3);
+    
+    p.x = startX + (p.targetX - startX) * ease;
+    p.y = startY + (p.targetY - startY) * ease;
+    
+    drawParticles(); // 重繪所有粒子
+    
+    if (progress < 1) {
+      requestAnimationFrame(update);
+    }
+  }
+  requestAnimationFrame(update);
+}
+
 
 // --- 階段三邏輯 (文字填空) ---
 function startStage3() {
@@ -590,15 +591,14 @@ function startStage3() {
   // 選項池
   const options = ['膨脹', '收縮', '上升', '下沉'];
   
-  // 清空並生成選項
   optionsContainer.innerHTML = '';
   options.forEach(opt => {
     let btn = document.createElement('button');
     btn.className = 'option-btn';
     btn.innerText = opt;
-    btn.dataset.text = opt;
     
-    btn.addEventListener('click', () => {
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
       if (state.activeBlank) {
         playSound('click');
         // 填入文字
@@ -630,7 +630,6 @@ function startStage3() {
     optionsContainer.appendChild(btn);
   });
 
-  // 設置當前選中的空格
   function setActiveBlank(id) {
     ['blank1', 'blank2', 'blank3'].forEach(b => {
       let el = document.getElementById(b);
@@ -642,7 +641,8 @@ function startStage3() {
 
   // 點擊空格可以重新選擇
   ['blank1', 'blank2', 'blank3'].forEach(id => {
-    document.getElementById(id).addEventListener('click', (e) => {
+    document.getElementById(id).addEventListener('pointerdown', (e) => {
+      e.preventDefault();
       // 清除該格答案
       e.target.innerText = '?';
       e.target.classList.remove('correct', 'wrong', 'active');
@@ -654,8 +654,12 @@ function startStage3() {
 
   setActiveBlank('blank1');
 
-  // 確認答案
-  btnCheck.addEventListener('click', () => {
+  // 確認答案 (移除舊的監聽器避免重複)
+  const newBtnCheck = btnCheck.cloneNode(true);
+  btnCheck.parentNode.replaceChild(newBtnCheck, btnCheck);
+  
+  newBtnCheck.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
     let correctAnswers = {
       blank1: '膨脹',
       blank2: '上升',
@@ -696,7 +700,6 @@ function startStage3() {
       dialog.style.color = '#B71C1C';
       dialog.style.border = '3px solid #E53935';
       
-      // 震動錯誤的空格
       for (let key in correctAnswers) {
         if (state.selectedAnswers[key] !== correctAnswers[key]) {
           let el = document.getElementById(key);
@@ -710,18 +713,10 @@ function startStage3() {
 }
 
 // 初始化遊戲
-window.onload = () => {
+window.addEventListener('load', () => {
   createParticles();
   drawParticles();
-  
-  // 隱藏階段一的按鈕，直到點擊太陽
-  btnExpand.style.display = 'none';
-  btnContract.style.display = 'none';
-  
-  // 階段二的氣壓圖示預設隱藏
-  lowPress.style.opacity = '0';
-  highPress.style.opacity = '0';
-};
+});
 </script>
 </body>
 </html>
