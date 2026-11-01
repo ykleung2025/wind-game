@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>風之工程師 V2 - 海陸風大解密</title>
+<style>
+  /* 基礎設定，針對 iPad 觸控優化 */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  body {
+    margin: 0; padding: 0; width: 100vw; height: 100vh;
+    font-family: "PingFang HK", "Microsoft JhengHei", sans-serif;
+    background-color: #87CEEB; overflow: hidden;
+    display: flex; justify-content: center; align-items: center;
+    touch-action: none; /* 防止 iPad 滑動時觸發網頁滾動 */
+  }
+  #game-container {
+    width: 100%; height: 100%; max-width: 1200px;
+    position: relative; background: linear-gradient(to bottom, #8ecae6, #e0fbfc);
+    overflow: hidden;
+  }
+
+  /* 頂部狀態列 */
+  #header {
+    position: absolute; top: 0; left: 0; width: 100%; height: 60px; 
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 20px; background: rgba(255,255,255,0.6); backdrop-filter: blur(5px);
+    font-size: 20px; font-weight: bold; color: #023047; z-index: 100;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+
+  /* 場景繪製 */
+  .scene { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
+  .sun { 
+    position: absolute; top: 10%; left: 15%; width: 80px; height: 80px; 
+    background: #FFD166; border-radius: 50%; box-shadow: 0 0 30px #FFD166; 
+    transition: all 1s; cursor: pointer; z-index: 10;
+  }
+  .sun.hot { background: #FF5722; box-shadow: 0 0 60px #FF5722; transform: scale(1.1); }
+  .land { position: absolute; bottom: 0; left: 0; width: 55%; height: 45%; background: #8BC34A; border-top-right-radius: 80% 100%; }
+  .ocean { position: absolute; bottom: 0; right: 0; width: 50%; height: 35%; background: #4FC3F7; border-top-left-radius: 80% 100%; }
+  .lighthouse { position: absolute; bottom: 42%; left: 48%; width: 30px; height: 80px; background: white; border: 2px solid #ccc; border-radius: 5px 5px 0 0; z-index: 5; }
+  .lighthouse::before { content:''; position: absolute; top: -15px; left: -5px; width: 40px; height: 15px; background: #FFB703; border-radius: 50% 50% 0 0; }
+  .tree { position: absolute; bottom: 40%; width: 40px; height: 60px; background: #2E7D32; border-radius: 50% 50% 20% 20%; transition: transform 0.2s; z-index: 5; }
+  .tree::after { content:''; position: absolute; bottom: -15px; left: 15px; width: 10px; height: 15px; background: #795548; }
+  .tree.t1 { left: 10%; }
+  .tree.t2 { left: 22%; height: 70px; bottom: 41%; }
+  .tree.wind { animation: sway 0.4s infinite alternate; }
+  @keyframes sway { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
+
+  /* 提示文字框 */
+  .dialog-box {
+    position: absolute; top: 12%; left: 50%; transform: translateX(-50%);
+    background: rgba(255,255,255,0.95); padding: 15px 30px; border-radius: 20px;
+    font-size: 22px; font-weight: bold; color: #023047; box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+    text-align: center; z-index: 50; transition: all 0.3s; border: 3px solid #219EBC;
+    min-width: 300px;
+  }
+
+  /* 按鈕 */
+  .btn {
+    padding: 15px 40px; font-size: 24px; font-weight: bold; border: none; border-radius: 30px;
+    background: #FB8500; color: white; box-shadow: 0 6px #d67000; cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s; outline: none;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px #d67000; }
+  .btn-blue { background: #219EBC; box-shadow: 0 6px #176b80; }
+  .btn-blue:active { box-shadow: 0 2px #176b80; }
+  .btn-green { background: #4CAF50; box-shadow: 0 6px #388E3C; }
+  .btn-green:active { box-shadow: 0 2px #388E3C; }
+
+  /* 階段控制 */
+  .stage { display: none; position: absolute; width: 100%; height: 100%; z-index: 20; }
+  .stage.active { display: block; }
+
+  /* 階段一 UI */
+  #stage1 .controls { position: absolute; bottom: 15%; left: 25%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 30; }
+  
+  /* 階段二 UI (Canvas) */
+  #stage2 { z-index: 30; }
+  #draw-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 25; }
+  .pressure-icon {
+    position: absolute; width: 60px; height: 60px; border-radius: 50%; display: flex;
+    justify-content: center; align-items: center; font-size: 36px; font-weight: bold;
+    color: white; opacity: 0; transition: opacity 0.5s; z-index: 26; pointer-events: none;
+  }
+  .pressure-icon.low { background: #E63946; top: 35%; left: 20%; }
+  .pressure-icon.high { background: #023047; top: 60%; right: 15%; }
+
+  /* 階段三 UI */
+  #stage3 .quiz-panel {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: white; padding: 40px; border-radius: 25px; width: 90%; max-width: 850px;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.3); z-index: 40; text-align: center;
+    display: none; flex-direction: column; gap: 25px; border: 5px solid #219EBC;
+  }
+  #stage3 .quiz-panel.active { display: flex; }
+  .quiz-text { font-size: 26px; line-height: 2.2; color: #333; text-align: left; }
+  .blank {
+    display: inline-block; min-width: 120px; padding: 5px 15px; margin: 0 5px;
+    border-bottom: 4px dashed #219EBC; color: #FB8500; font-weight: bold; text-align: center;
+    background: #e0fbfc; border-radius: 8px; cursor: pointer; transition: all 0.2s;
+  }
+  .blank.active { background: #FFD166; border-bottom-color: #FB8500; transform: scale(1.05); }
+  .blank.correct { background: #C8E6C9; color: #2E7D32; border-bottom-color: #2E7D32; border-bottom-style: solid; }
+  .blank.wrong { background: #FFCDD2; color: #B71C1C; border-bottom-color: #B71C1C; border-bottom-style: solid; }
+  
+  .options { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 10px; }
+  .option-btn {
+    padding: 15px 35px; font-size: 24px; background: #f8f9fa; border: 3px solid #adb5bd;
+    border-radius: 15px; color: #495057; font-weight: bold; cursor: pointer;
+    transition: all 0.2s; box-shadow: 0 4px #adb5bd;
+  }
+  .option-btn:active { transform: translateY(2px); box-shadow: 0 2px #adb5bd; }
+  .option-btn:hover { border-color: #219EBC; color: #219EBC; }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+  <!-- 背景場景 -->
+  <div class="scene">
+    <div class="sun" id="sun"></div>
+    <div class="land"></div>
+    <div class="ocean"></div>
+    <div class="lighthouse"></div>
+    <div class="tree t1" id="tree1"></div>
+    <div class="tree t2" id="tree2"></div>
+  </div>
+
+  <!-- 頂部狀態 -->
+  <div id="header">
+    <div>🌍 風之工程師 V2</div>
+    <div id="status-text">任務：點擊太陽加熱陸地</div>
+  </div>
+
+  <!-- 提示對話框 -->
+  <div class="dialog-box" id="dialog">點擊左上角的太陽，讓陸地受熱！</div>
+
+  <!-- 粒子層 -->
+  <canvas id="particle-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:15; pointer-events:none;"></canvas>
+
+  <!-- 階段一：熱空氣 -->
+  <div class="stage active" id="stage1">
+    <div class="controls">
+      <button class="btn" id="btn-expand">膨脹</button>
+      <button class="btn btn-blue" id="btn-contract">收縮</button>
+    </div>
+  </div>
+
+  <!-- 階段二：冷空氣補充 (畫線互動) -->
+  <div class="stage" id="stage2">
+    <canvas id="draw-canvas"></canvas>
+    <div class="pressure-icon low" id="low-press">－</div>
+    <div class="pressure-icon high" id="high-press">＋</div>
+  </div>
+
+  <!-- 階段三：文字填空 -->
+  <div class="stage" id="stage3">
+    <div class="quiz-panel" id="quiz-panel">
+      <div class="quiz-text">
+        日間，在太陽的照射下，陸地上的空氣因受熱
+        <span class="blank" id="blank1">?</span> 而
+        <span class="blank" id="blank2">?</span>。<br>
+        海洋上較冷的空氣會流向陸地，補充了
+        <span class="blank" id="blank3">?</span> 的空氣。<br>
+        這樣，空氣流動便形成風。
+      </div>
+      <div class="options" id="options-container">
+        <!-- JS 動態生成選項 -->
+      </div>
+      <button class="btn btn-green" id="btn-check" style="margin-top: 10px; display: none;">確認答案</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* 
+  V2 改善重點：
+  1. 使用 Canvas 進行粒子與畫線動畫，iPad 觸控更流暢。
+  2. 粒子動畫嚴格遵守「距離拉開」而非「體積變大」。
+  3. 階段三填空互動優化，點擊空格再選答案，並加入視覺回饋。
+  4. 加入 Web Audio API 音效。
+*/
+
+// --- 音效產生器 (無需外部檔案) ---
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+function initAudio() {
+  if (!audioCtx) audioCtx = new AudioContext();
+}
+function playSound(type) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  
+  if (type === 'click') {
+    osc.type = 'sine'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+  } else if (type === 'success') {
+    osc.type = 'triangle'; 
+    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+  } else if (type === 'error') {
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+  } else if (type === 'wind') {
+    // 簡單的白噪音模擬風聲
+    const bufferSize = audioCtx.sampleRate * 1.5; 
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass'; filter.frequency.value = 800;
+    noise.connect(filter); filter.connect(gain);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+    noise.start(); noise.stop(audioCtx.currentTime + 1.5);
+  }
+}
+
+// --- 全局狀態 ---
+const state = {
+  stage: 1,
+  sunHot: false,
+  particles: [],
+  animId: null,
+  selectedAnswers: { blank1: null, blank2: null, blank3: null },
+  activeBlank: 'blank1'
+};
+
+// --- DOM 元素 ---
+const sun = document.getElementById('sun');
+const dialog = document.getElementById('dialog');
+const statusText = document.getElementById('status-text');
+const btnExpand = document.getElementById('btn-expand');
+const btnContract = document.getElementById('btn-contract');
+const stage1 = document.getElementById('stage1');
+const stage2 = document.getElementById('stage2');
+const stage3 = document.getElementById('stage3');
+const drawCanvas = document.getElementById('draw-canvas');
+const ctxDraw = drawCanvas.getContext('2d');
+const particleCanvas = document.getElementById('particle-canvas');
+const ctxPart = particleCanvas.getContext('2d');
+const lowPress = document.getElementById('low-press');
+const highPress = document.getElementById('high-press');
+const trees = [document.getElementById('tree1'), document.getElementById('tree2')];
+const quizPanel = document.getElementById('quiz-panel');
+const optionsContainer = document.getElementById('options-container');
+const btnCheck = document.getElementById('btn-check');
+
+// 初始化 Canvas 尺寸
+function resizeCanvas() {
+  particleCanvas.width = window.innerWidth;
+  particleCanvas.height = window.innerHeight;
+  drawCanvas.width = window.innerWidth;
+  drawCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// --- 粒子系統 (Stage 1 & 2) ---
+function createParticles() {
+  state.particles = [];
+  const startX = window.innerWidth * 0.25; // 陸地中心
+  const startY = window.innerHeight * 0.6;  // 陸地上方
+  
+  for (let i = 0; i < 40; i++) {
+    // 初始密集狀態
+    let x = startX + (Math.random() - 0.5) * 100;
+    let y = startY + (Math.random() - 0.5) * 80;
+    state.particles.push({
+      x: x, y: y,
+      baseX: x, baseY: y,
+      radius: 6,
+      color: '#FF5722',
+      vx: 0, vy: 0
+    });
+  }
+}
+
+function drawParticles() {
+  ctxPart.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+  state.particles.forEach(p => {
+    ctxPart.beginPath();
+    ctxPart.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctxPart.fillStyle = p.color;
+    ctxPart.fill();
+    // 加點發光效果
+    ctxPart.shadowBlur = 10;
+    ctxPart.shadowColor = p.color;
+  });
+  ctxPart.shadowBlur = 0;
+}
+
+function animateParticles() {
+  let needsRedraw = false;
+  state.particles.forEach(p => {
+    if (p.vx !== 0 || p.vy !== 0) {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.95; // 摩擦力
+      p.vy *= 0.95;
+      if (Math.abs(p.vx) > 0.1 || Math.abs(p.vy) > 0.1) needsRedraw = true;
+    }
+  });
+  if (needsRedraw) {
+    drawParticles();
+    state.animId = requestAnimationFrame(animateParticles);
+  } else {
+    drawParticles();
+  }
+}
+
+// --- 階段一邏輯 ---
+sun.addEventListener('click', () => {
+  if (state.stage !== 1 || state.sunHot) return;
+  initAudio(); playSound('click');
+  
+  state.sunHot = true;
+  sun.classList.add('hot');
+  dialog.innerText = '陸地受熱了！空氣會怎樣呢？';
+  statusText.innerText = '任務：選擇空氣的變化';
+  btnExpand.style.display = 'inline-block';
+  btnContract.style.display = 'inline-block';
+
+  // 粒子震動效果 (受熱)
+  state.particles.forEach(p => {
+    p.vx = (Math.random() - 0.5) * 15;
+    p.vy = (Math.random() - 0.5) * 15;
+  });
+  cancelAnimationFrame(state.animId);
+  animateParticles();
+});
+
+btnExpand.addEventListener('click', () => {
+  if (!state.sunHot) return;
+  playSound('success');
+  btnExpand.style.display = 'none';
+  btnContract.style.display = 'none';
+  dialog.innerText = '空氣受熱膨脹，粒子距離拉開，整體體積變大！';
+  statusText.innerText = '觀察：熱空氣上升中';
+  
+  // 動畫：粒子距離拉開並整體上升
+  state.particles.forEach(p => {
+    // 計算從中心向外擴散的方向
+    let dx = p.x - (window.innerWidth * 0.25);
+    let dy = p.y - (window.innerHeight * 0.6);
+    let dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    
+    // 設定目標位置：向外擴散，並向上移動
+    let targetX = p.x + (dx / dist) * (60 + Math.random() * 40);
+    let targetY = p.y + (dy / dist) * (60 + Math.random() * 40) - 250; // 向上移動
+
+    // 使用動畫過渡
+    let startX = p.x, startY = p.y;
+    let startTime = performance.now();
+    let duration = 1500;
+
+    function update() {
+      let time = performance.now() - startTime;
+      let progress = Math.min(time / duration, 1);
+      // 緩動函數 easeOutQuad
+      let ease = 1 - (1 - progress) * (1 - progress);
+      
+      p.x = startX + (targetX - startX) * ease;
+      p.y = startY + (targetY - startY) * ease;
+      drawParticles();
+
+      if (progress < 1) {
+        requestAnimationFrame(update);
+      } else if (p === state.particles[state.particles.length - 1]) {
+        // 最後一個粒子移動完畢
+        setTimeout(startStage2, 500);
+      }
+    }
+    requestAnimationFrame(update);
+  });
+  
+  // 確保粒子顏色變淡(上升)
+  setTimeout(() => {
+    state.particles.forEach(p => p.color = 'rgba(255, 87, 34, 0.5)');
+  }, 800);
+});
+
+btnContract.addEventListener('click', () => {
+  playSound('error');
+  dialog.innerText = '不對喔！空氣受熱時，粒子會拉開距離膨脹，再試一次！';
+  btnContract.style.transform = 'translateX(5px)';
+  setTimeout(() => btnContract.style.transform = 'translateX(-5px)', 100);
+  setTimeout(() => btnContract.style.transform = 'translateX(0)', 200);
+});
+
+
+// --- 階段二邏輯 (Canvas 畫線) ---
+let isDrawing = false;
+let startX = 0, startY = 0;
+let currentLine = null;
+
+function startStage2() {
+  stage1.classList.remove('active');
+  stage2.classList.add('active');
+  dialog.innerText = '熱空氣上升了，陸地變空！請用手指從海洋向左劃，引導冷空氣補充。';
+  statusText.innerText = '任務：引導冷空氣';
+  
+  lowPress.style.opacity = '1';
+  highPress.style.opacity = '1';
+  
+  // 清空粒子畫布，準備接收冷空氣
+  state.particles = [];
+  ctxPart.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+
+  // 綁定觸控事件
+  drawCanvas.style.pointerEvents = 'auto'; // 允許Canvas接收觸控
+  drawCanvas.addEventListener('touchstart', onPointerDown, {passive: false});
+  drawCanvas.addEventListener('touchmove', onPointerMove, {passive: false});
+  drawCanvas.addEventListener('touchend', onPointerUp);
+  drawCanvas.addEventListener('mousedown', onPointerDown);
+  drawCanvas.addEventListener('mousemove', onPointerMove);
+  drawCanvas.addEventListener('mouseup', onPointerUp);
+}
+
+function getPos(e) {
+  let clientX, clientY;
+  if (e.touches && e.touches.length > 0) {
+    clientX = e.touches[0].clientX;
+    clientY = e.touches[0].clientY;
+  } else {
+    clientX = e.clientX;
+    clientY = e.clientY;
+  }
+  return { x: clientX, y: clientY };
+}
+
+function onPointerDown(e) {
+  e.preventDefault();
+  const pos = getPos(e);
+  // 必須從右側 (海洋) 開始劃
+  if (pos.x > window.innerWidth * 0.5) {
+    isDrawing = true;
+    startX = pos.x;
+    startY = pos.y;
+    currentLine = { startX, startY, endX: startX, endY: startY };
+    drawLine();
+  }
+}
+
+function onPointerMove(e) {
+  if (!isDrawing) return;
+  e.preventDefault();
+  const pos = getPos(e);
+  currentLine.endX = pos.x;
+  currentLine.endY = pos.y;
+  drawLine();
+}
+
+function onPointerUp(e) {
+  if (!isDrawing) return;
+  isDrawing = false;
+  const pos = getPos(e);
+  
+  // 判斷成功條件：向左劃動超過 150px，且結束位置在左半邊
+  if (pos.x < startX - 150 && pos.x < window.innerWidth * 0.45) {
+    playSound('wind');
+    // 成功！
+    removePointerEvents();
+    ctxDraw.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    dialog.innerText = '冷空氣從高氣壓（海洋）流向低氣壓（陸地）補充！';
+    successStage2();
+  } else {
+    // 失敗，清除線條
+    playSound('error');
+    ctxDraw.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    currentLine = null;
+    dialog.innerText = '要從海洋（右邊）向左劃向陸地（左邊）才對喔！';
+  }
+}
+
+function drawLine() {
+  ctxDraw.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  if (!currentLine) return;
+  
+  ctxDraw.beginPath();
+  ctxDraw.moveTo(currentLine.startX, currentLine.startY);
+  ctxDraw.lineTo(currentLine.endX, currentLine.endY);
+  ctxDraw.strokeStyle = 'rgba(0, 180, 216, 0.8)';
+  ctxDraw.lineWidth = 15;
+  ctxDraw.lineCap = 'round';
+  ctxDraw.stroke();
+  
+  // 加個箭頭
+  let angle = Math.atan2(currentLine.endY - currentLine.startY, currentLine.endX - currentLine.startX);
+  let arrowX = currentLine.endX - 20 * Math.cos(angle);
+  let arrowY = currentLine.endY - 20 * Math.sin(angle);
+  ctxDraw.beginPath();
+  ctxDraw.moveTo(currentLine.endX, currentLine.endY);
+  ctxDraw.lineTo(arrowX - 10 * Math.sin(angle), arrowY + 10 * Math.cos(angle));
+  ctxDraw.lineTo(arrowX + 10 * Math.sin(angle), arrowY - 10 * Math.cos(angle));
+  ctxDraw.closePath();
+  ctxDraw.fillStyle = 'rgba(0, 180, 216, 1)';
+  ctxDraw.fill();
+}
+
+function removePointerEvents() {
+  drawCanvas.removeEventListener('touchstart', onPointerDown);
+  drawCanvas.removeEventListener('touchmove', onPointerMove);
+  drawCanvas.removeEventListener('touchend', onPointerUp);
+  drawCanvas.removeEventListener('mousedown', onPointerDown);
+  drawCanvas.removeEventListener('mousemove', onPointerMove);
+  drawCanvas.removeEventListener('mouseup', onPointerUp);
+  drawCanvas.style.pointerEvents = 'none';
+}
+
+function successStage2() {
+  // 隱藏氣壓圖示
+  lowPress.style.opacity = '0';
+  highPress.style.opacity = '0';
+  
+  // 生成冷空氣粒子從右向左移動
+  for (let i = 0; i < 30; i++) {
+    let startX = window.innerWidth * 0.8 + (Math.random() - 0.5) * 100;
+    let startY = window.innerHeight * 0.5 + (Math.random() - 0.5) * 100;
+    let targetX = window.innerWidth * 0.25 + (Math.random() - 0.5) * 100;
+    let targetY = window.innerHeight * 0.6 + (Math.random() - 0.5) * 100;
+    
+    let p = {
+      x: startX, y: startY, targetX: targetX, targetY: targetY,
+      radius: 6, color: '#00B4D8', progress: 0
+    };
+    
+    // 使用動畫
+    let startTime = performance.now() + i * 40;
+    let duration = 800;
+    
+    function update() {
+      let time = performance.now() - startTime;
+      if (time < 0) { requestAnimationFrame(update); return; }
+      
+      let progress = Math.min(time / duration, 1);
+      let ease = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+      
+      p.x = startX + (targetX - startX) * ease;
+      p.y = startY + (targetY - startY) * ease;
+      
+      ctxPart.beginPath();
+      ctxPart.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctxPart.fillStyle = p.color;
+      ctxPart.fill();
+      
+      if (progress < 1) {
+        requestAnimationFrame(update);
+      }
+    }
+    requestAnimationFrame(update);
+  }
+
+  // 樹木搖擺 (風的視覺回饋)
+  setTimeout(() => {
+    trees.forEach(t => t.classList.add('wind'));
+  }, 500);
+
+  // 進入階段三
+  setTimeout(() => {
+    dialog.style.opacity = '0';
+    startStage3();
+  }, 2500);
+}
+
+
+// --- 階段三邏輯 (文字填空) ---
+function startStage3() {
+  stage2.classList.remove('active');
+  stage3.classList.add('active');
+  statusText.innerText = '最終任務：完成科學填空';
+  quizPanel.classList.add('active');
+  dialog.style.opacity = '0';
+
+  // 選項池
+  const options = ['膨脹', '收縮', '上升', '下沉'];
+  
+  // 清空並生成選項
+  optionsContainer.innerHTML = '';
+  options.forEach(opt => {
+    let btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerText = opt;
+    btn.dataset.text = opt;
+    
+    btn.addEventListener('click', () => {
+      if (state.activeBlank) {
+        playSound('click');
+        // 填入文字
+        let blankEl = document.getElementById(state.activeBlank);
+        blankEl.innerText = opt;
+        blankEl.classList.add('active');
+        state.selectedAnswers[state.activeBlank] = opt;
+        
+        // 尋找下一個未填的空格
+        let nextBlank = null;
+        if (!state.selectedAnswers.blank1) nextBlank = 'blank1';
+        else if (!state.selectedAnswers.blank2) nextBlank = 'blank2';
+        else if (!state.selectedAnswers.blank3) nextBlank = 'blank3';
+        
+        if (nextBlank) {
+          setActiveBlank(nextBlank);
+        } else {
+          setActiveBlank(null);
+        }
+
+        // 檢查是否全部填完
+        if (state.selectedAnswers.blank1 && state.selectedAnswers.blank2 && state.selectedAnswers.blank3) {
+          btnCheck.style.display = 'inline-block';
+        } else {
+          btnCheck.style.display = 'none';
+        }
+      }
+    });
+    optionsContainer.appendChild(btn);
+  });
+
+  // 設置當前選中的空格
+  function setActiveBlank(id) {
+    ['blank1', 'blank2', 'blank3'].forEach(b => {
+      let el = document.getElementById(b);
+      if (b === id) el.classList.add('active');
+      else el.classList.remove('active');
+    });
+    state.activeBlank = id;
+  }
+
+  // 點擊空格可以重新選擇
+  ['blank1', 'blank2', 'blank3'].forEach(id => {
+    document.getElementById(id).addEventListener('click', (e) => {
+      // 清除該格答案
+      e.target.innerText = '?';
+      e.target.classList.remove('correct', 'wrong', 'active');
+      state.selectedAnswers[id] = null;
+      setActiveBlank(id);
+      btnCheck.style.display = 'none';
+    });
+  });
+
+  setActiveBlank('blank1');
+
+  // 確認答案
+  btnCheck.addEventListener('click', () => {
+    let correctAnswers = {
+      blank1: '膨脹',
+      blank2: '上升',
+      blank3: '上升'
+    };
+
+    let allCorrect = true;
+    for (let key in correctAnswers) {
+      let el = document.getElementById(key);
+      if (state.selectedAnswers[key] === correctAnswers[key]) {
+        el.classList.add('correct');
+        el.classList.remove('wrong');
+      } else {
+        el.classList.add('wrong');
+        el.classList.remove('correct');
+        allCorrect = false;
+      }
+    }
+
+    if (allCorrect) {
+      playSound('success');
+      dialog.style.opacity = '1';
+      dialog.innerText = '太棒了！你成功製造了風！🌬️';
+      dialog.style.background = '#C8E6C9';
+      dialog.style.color = '#2E7D32';
+      dialog.style.border = '3px solid #4CAF50';
+      
+      quizPanel.style.display = 'none';
+      statusText.innerText = '任務完成！🌟';
+      
+      sun.classList.remove('hot');
+      trees.forEach(t => t.classList.add('wind'));
+    } else {
+      playSound('error');
+      dialog.style.opacity = '1';
+      dialog.innerText = '有些答案不對喔，想想空氣受熱後會怎樣？';
+      dialog.style.background = '#FFCDD2';
+      dialog.style.color = '#B71C1C';
+      dialog.style.border = '3px solid #E53935';
+      
+      // 震動錯誤的空格
+      for (let key in correctAnswers) {
+        if (state.selectedAnswers[key] !== correctAnswers[key]) {
+          let el = document.getElementById(key);
+          el.style.transform = 'translateX(5px)';
+          setTimeout(() => el.style.transform = 'translateX(-5px)', 100);
+          setTimeout(() => el.style.transform = 'translateX(0)', 200);
+        }
+      }
+    }
+  });
+}
+
+// 初始化遊戲
+window.onload = () => {
+  createParticles();
+  drawParticles();
+  
+  // 隱藏階段一的按鈕，直到點擊太陽
+  btnExpand.style.display = 'none';
+  btnContract.style.display = 'none';
+  
+  // 階段二的氣壓圖示預設隱藏
+  lowPress.style.opacity = '0';
+  highPress.style.opacity = '0';
+};
+</script>
+</body>
+</html>
