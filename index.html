@@ -162,6 +162,21 @@
       <div class="tag" id="tag-sea">海洋</div>
       <div class="badge low" id="badge-low"><small>陸地</small>低氣壓</div>
       <div class="badge high" id="badge-high"><small>海洋</small>高氣壓</div>
+
+      <div id="drops" hidden>
+        <div class="drop" data-slot="hot" tabindex="0">
+          <span class="drop-label">靠近陸地</span>
+          <div class="drop-well"><span class="drop-hint">拖到這裡</span></div>
+        </div>
+        <div class="drop" data-slot="wind" tabindex="0">
+          <span class="drop-label">風的路徑</span>
+          <div class="drop-well"><span class="drop-hint">拖到這裡</span></div>
+        </div>
+        <div class="drop" data-slot="cold" tabindex="0">
+          <span class="drop-label">靠近海洋</span>
+          <div class="drop-well"><span class="drop-hint">拖到這裡</span></div>
+        </div>
+      </div>
     </div>
 
     <section id="coach">
@@ -172,13 +187,24 @@
       <div id="choices" class="choices"></div>
       <div id="order" hidden></div>
       <form id="answer-form" hidden>
-        <label for="answer">你的句子</label>
+        <div class="answer-head">
+          <label for="answer">你的句子</label>
+          <button type="button" id="voice-btn" class="voice-btn" aria-pressed="false" aria-controls="answer">語音輸入</button>
+        </div>
         <textarea id="answer" maxlength="160" placeholder="例如：空氣受熱之後……"></textarea>
+        <p id="voice-tip" class="fine" hidden aria-live="polite"></p>
         <p class="fine">90 分或以上過關。句子只在這部裝置評分，不會上傳。</p>
-        <button class="primary" type="submit">交給 AI 評分</button>
+        <div class="form-row">
+          <button class="primary" type="submit">交給 AI 評分</button>
+          <button type="button" id="adapt-open" class="adapt-btn">較容易（調適）</button>
+        </div>
         <div id="result"></div>
         <p id="scaffold" hidden></p>
       </form>
+      <div id="adapt" hidden>
+        <div id="adapt-bank" class="bank" aria-label="答案卡片"></div>
+        <button type="button" class="adapt-btn" id="adapt-close">改回打字</button>
+      </div>
       <div id="actions"></div>
     </section>
   </div>

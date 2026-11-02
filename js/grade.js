@@ -56,6 +56,10 @@ function toTrad(text) {
   return [...text].map((ch) => TRAD[ch] || ch).join("");
 }
 
+export function toTraditional(raw) {
+  return toTrad(String(raw ?? ""));
+}
+
 export function normalizeAnswer(raw) {
   let text = toTrad(String(raw ?? "").trim());
   text = text.replace(/昇/g, "升");

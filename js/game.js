@@ -1,4 +1,4 @@
-import { gradeAnswer } from "./grade.js";
+import { gradeAnswer, toTraditional } from "./grade.js";
 
 const CHAIN = [
   { id: "sun", text: "太陽加熱陸地" },
@@ -74,6 +74,17 @@ const PROGRESS = [
   { label: "說出來", steps: ["explain", "done"] },
 ];
 
+const PASS_SENTENCE = "熱空氣上升，冷空氣補上，空氣流動就成為風。";
+
+const ADAPT_CARDS = [
+  { id: "hot", text: "熱空氣上升" },
+  { id: "cold", text: "冷空氣補上" },
+  { id: "wind", text: "空氣流動就成為風" },
+  { id: "extra", text: "冷空氣上升" },
+];
+
+const VOICE_LANGS = ["zh-HK", "zh-TW", "zh-CN"];
+
 const sky = document.getElementById("sky");
 const world = document.getElementById("world");
 const air = document.getElementById("air");
@@ -93,6 +104,12 @@ const form = document.getElementById("answer-form");
 const answer = document.getElementById("answer");
 const result = document.getElementById("result");
 const scaffold = document.getElementById("scaffold");
+const voiceBtn = document.getElementById("voice-btn");
+const voiceTip = document.getElementById("voice-tip");
+const adapt = document.getElementById("adapt");
+const adaptOpen = document.getElementById("adapt-open");
+const adaptClose = document.getElementById("adapt-close");
+const drops = document.getElementById("drops");
 const actions = document.getElementById("actions");
 const progress = document.getElementById("progress");
 const muteBtn = document.getElementById("mute");
@@ -121,6 +138,10 @@ const state = {
   drawing: false,
   finalText: "",
   finalScore: 0,
+  adaptOn: false,
+  adaptDeck: [],
+  placed: { hot: null, cold: null, wind: null },
+  selectedCard: null,
 };
 
 let audioCtx = null;
@@ -238,19 +259,27 @@ function renderProgress() {
 }
 
 function enter(next) {
+  stopVoice();
   state.step = next;
   state.lock = false;
   state.question = QUESTIONS[next] || null;
+  state.adaptOn = false;
+  state.adaptDeck = [];
+  state.placed = { hot: null, cold: null, wind: null };
+  state.selectedCard = null;
   document.body.className = "";
   if (next === "heat") document.body.classList.add("is-heat");
   if (next === "draw") document.body.classList.add("is-draw");
   if (next === "explain") document.body.classList.add("is-write");
   if (next === "done") document.body.classList.add("is-done");
+  fitCanvas();
 
   choices.innerHTML = "";
   actions.innerHTML = "";
   order.hidden = true;
   form.hidden = true;
+  adapt.hidden = true;
+  drops.hidden = true;
   result.innerHTML = "";
   scaffold.hidden = true;
   showFeedback("");
@@ -424,6 +453,10 @@ function renderExplain() {
   prompt.textContent = "用自己的句子，寫出風是怎樣形成的。";
   lead.textContent = "寫完整個過程，90 分或以上就可以過關。";
   form.hidden = false;
+  adapt.hidden = true;
+  drops.hidden = true;
+  adaptOpen.hidden = false;
+  adaptClose.hidden = false;
   answer.focus();
 }
 
@@ -464,6 +497,8 @@ function renderResult(graded) {
   if (graded.passed) {
     state.finalText = answer.value.trim();
     state.finalScore = graded.score;
+    adaptOpen.hidden = true;
+    stopVoice();
     showContinue("done", graded.score === 100 ? "滿分過關" : "過關，領取證書");
     actions.querySelector("button")?.scrollIntoView({ block: "end" });
   }
@@ -699,6 +734,401 @@ function frame(now) {
   }
 }
 
+let recognition = null;
+let voiceLangIndex = 0;
+let voiceListening = false;
+let voiceBase = "";
+let voiceHeard = false;
+let voiceWantStop = false;
+let voiceRetry = false;
+let voiceNote = "";
+let drag = null;
+let skipClick = false;
+let skipTimer = 0;
+
+function setupVoice() {
+  const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Ctor) {
+    markVoiceUnsupported();
+    return;
+  }
+  try {
+    recognition = new Ctor();
+  } catch {
+    markVoiceUnsupported();
+    return;
+  }
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  recognition.maxAlternatives = 1;
+  recognition.onstart = () => {
+    voiceListening = true;
+    voiceHeard = false;
+    voiceBtn.textContent = "停止輸入";
+    voiceBtn.setAttribute("aria-pressed", "true");
+    voiceTip.hidden = false;
+    voiceTip.textContent = "正在聽你說話……";
+  };
+  recognition.onresult = (event) => {
+    let text = "";
+    for (let index = 0; index < event.results.length; index += 1) {
+      text += event.results[index][0].transcript;
+    }
+    text = text.trim();
+    if (!text) return;
+    voiceHeard = true;
+    const limit = answer.maxLength > 0 ? answer.maxLength : 160;
+    answer.value = toTraditional(text).slice(0, limit);
+    answer.dispatchEvent(new Event("input"));
+  };
+  recognition.onerror = (event) => {
+    const code = event.error;
+    if (code === "aborted") return;
+    if (code === "no-speech") return;
+    if (code === "language-not-supported" && voiceLangIndex < VOICE_LANGS.length - 1) {
+      voiceLangIndex += 1;
+      voiceRetry = true;
+      return;
+    }
+    if (code === "language-not-supported") {
+      markVoiceUnsupported();
+      return;
+    }
+    voiceTip.hidden = false;
+    if (code === "not-allowed" || code === "service-not-allowed") {
+      voiceNote = "mic";
+      voiceTip.textContent = "未能使用麥克風，可以改為打字。";
+      return;
+    }
+    voiceNote = "fail";
+    voiceTip.textContent = "語音輸入暫時未能使用，可以改為打字。";
+  };
+  recognition.onend = () => {
+    voiceListening = false;
+    const stopped = voiceWantStop;
+    const retry = voiceRetry;
+    const note = voiceNote;
+    voiceWantStop = false;
+    voiceRetry = false;
+    voiceNote = "";
+    voiceBtn.textContent = "語音輸入";
+    voiceBtn.setAttribute("aria-pressed", "false");
+    if (retry) {
+      window.setTimeout(() => startVoice(), 0);
+      return;
+    }
+    if (!voiceHeard) answer.value = voiceBase;
+    if (voiceBtn.disabled || note) return;
+    if (voiceHeard) {
+      voiceTip.hidden = false;
+      voiceTip.textContent = "可以改一改句子，再交給評分。";
+      return;
+    }
+    if (!stopped) {
+      voiceTip.hidden = false;
+      voiceTip.textContent = "沒有聽到說話，再按一次語音輸入。";
+    }
+  };
+}
+
+function markVoiceUnsupported() {
+  recognition = null;
+  voiceBtn.disabled = true;
+  voiceBtn.setAttribute("aria-pressed", "false");
+  voiceTip.hidden = false;
+  voiceTip.textContent = "此裝置不支援語音輸入";
+}
+
+function startVoice() {
+  if (!recognition || voiceBtn.disabled || state.step !== "explain" || state.adaptOn) return;
+  voiceBase = answer.value;
+  voiceHeard = false;
+  voiceWantStop = false;
+  recognition.lang = VOICE_LANGS[voiceLangIndex];
+  try {
+    recognition.start();
+  } catch (error) {
+    if (error && error.name === "InvalidStateError") return;
+    voiceTip.hidden = false;
+    voiceTip.textContent = "語音輸入暫時未能使用，可以改為打字。";
+  }
+}
+
+function stopVoice() {
+  if (!recognition || !voiceListening) return;
+  voiceWantStop = true;
+  voiceRetry = false;
+  try {
+    recognition.stop();
+  } catch {
+    voiceListening = false;
+  }
+}
+
+function openAdapt() {
+  if (state.step !== "explain" || state.lock) return;
+  stopVoice();
+  state.adaptOn = true;
+  if (state.adaptDeck.length === 0) {
+    state.adaptDeck = shuffle(ADAPT_CARDS);
+    state.placed = { hot: null, cold: null, wind: null };
+    state.selectedCard = null;
+  }
+  document.body.classList.add("is-adapt");
+  fitCanvas();
+  form.hidden = true;
+  adapt.hidden = false;
+  drops.hidden = false;
+  adaptClose.hidden = false;
+  prompt.textContent = "把卡片放到圖旁邊的空位。";
+  lead.textContent = "拖卡片到空位，也可以先點卡片再點空位。三個空位都放對就可以過關。";
+  showFeedback("");
+  paintAdapt();
+  document.querySelector("#adapt-bank .drag-card")?.focus();
+}
+
+function closeAdapt() {
+  if (!state.adaptOn || state.lock) return;
+  cleanupDrag();
+  state.adaptOn = false;
+  state.selectedCard = null;
+  document.body.classList.remove("is-adapt");
+  fitCanvas();
+  adapt.hidden = true;
+  drops.hidden = true;
+  form.hidden = false;
+  prompt.textContent = "用自己的句子，寫出風是怎樣形成的。";
+  lead.textContent = "寫完整個過程，90 分或以上就可以過關。";
+  showFeedback("");
+  answer.focus();
+}
+
+function makeCard(item) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "chip drag-card";
+  if (state.selectedCard === item.id) button.classList.add("is-selected");
+  button.dataset.id = item.id;
+  button.textContent = item.text;
+  button.setAttribute("aria-pressed", state.selectedCard === item.id ? "true" : "false");
+  button.disabled = state.lock;
+  return button;
+}
+
+function paintAdapt() {
+  const bank = document.getElementById("adapt-bank");
+  bank.innerHTML = "";
+  state.adaptDeck.forEach((item) => {
+    const placed = Object.values(state.placed).includes(item.id);
+    if (!placed) bank.appendChild(makeCard(item));
+  });
+  drops.querySelectorAll(".drop").forEach((slot) => {
+    const slotId = slot.dataset.slot;
+    const cardId = state.placed[slotId];
+    const well = slot.querySelector(".drop-well");
+    const label = slot.querySelector(".drop-label").textContent;
+    well.querySelectorAll(".drag-card").forEach((node) => node.remove());
+    slot.classList.toggle("is-filled", Boolean(cardId));
+    if (!cardId) {
+      slot.setAttribute("aria-label", `空位，${label}`);
+      slot.tabIndex = 0;
+      return;
+    }
+    const item = state.adaptDeck.find((card) => card.id === cardId);
+    well.appendChild(makeCard(item));
+    slot.setAttribute("aria-label", `${label}，${item.text}`);
+    slot.tabIndex = -1;
+  });
+}
+
+function toggleSelect(id) {
+  if (state.lock) return;
+  state.selectedCard = state.selectedCard === id ? null : id;
+  paintAdapt();
+  document.querySelector(`.drag-card[data-id="${id}"]`)?.focus();
+  showFeedback(state.selectedCard ? "再點一個空位。" : "");
+}
+
+function flashSlot(slotId) {
+  const slot = drops.querySelector(`.drop[data-slot="${slotId}"]`);
+  if (!slot) return;
+  slot.classList.remove("is-shake");
+  void slot.offsetWidth;
+  slot.classList.add("is-shake");
+  window.setTimeout(() => slot.classList.remove("is-shake"), 360);
+}
+
+function tryPlace(cardId, slotId) {
+  if (state.lock || !state.adaptOn) return;
+  if (cardId === "extra") {
+    state.selectedCard = null;
+    paintAdapt();
+    tone("no");
+    showFeedback("這張用不到，請拖另外的卡片。", "no");
+    flashSlot(slotId);
+    return;
+  }
+  if (state.placed[slotId] === cardId) {
+    state.selectedCard = null;
+    paintAdapt();
+    return;
+  }
+  if (state.placed[slotId]) {
+    state.selectedCard = null;
+    paintAdapt();
+    tone("no");
+    showFeedback("這裡已經有一張卡片。", "no");
+    flashSlot(slotId);
+    return;
+  }
+  if (cardId !== slotId) {
+    state.selectedCard = null;
+    paintAdapt();
+    tone("no");
+    showFeedback("這張不是放在這裡，再試一次。", "no");
+    flashSlot(slotId);
+    return;
+  }
+  Object.keys(state.placed).forEach((key) => {
+    if (state.placed[key] === cardId) state.placed[key] = null;
+  });
+  state.placed[slotId] = cardId;
+  state.selectedCard = null;
+  const done = ["hot", "cold", "wind"].every((key) => state.placed[key] === key);
+  if (done) {
+    completeAdapt();
+    return;
+  }
+  tone("ok");
+  showFeedback("放對了。", "ok");
+  paintAdapt();
+}
+
+function completeAdapt() {
+  state.lock = true;
+  const graded = gradeAnswer(PASS_SENTENCE);
+  state.finalText = PASS_SENTENCE;
+  state.finalScore = graded.passed ? graded.score : 100;
+  answer.value = PASS_SENTENCE;
+  paintAdapt();
+  adaptClose.hidden = true;
+  tone("ok");
+  showFeedback("三個空位都放對了。", "ok");
+  showContinue("done", state.finalScore === 100 ? "滿分過關" : "過關，領取證書");
+  const nextButton = actions.querySelector("button");
+  nextButton?.focus();
+  nextButton?.scrollIntoView({ block: "end" });
+}
+
+function slotFromPoint(x, y) {
+  const nodes = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [document.elementFromPoint(x, y)];
+  for (const node of nodes) {
+    if (!node) continue;
+    const slot = node.closest?.(".drop");
+    if (slot && drops.contains(slot)) return slot;
+  }
+  let nearest = null;
+  let nearestDist = 20;
+  drops.querySelectorAll(".drop").forEach((slot) => {
+    const rect = slot.getBoundingClientRect();
+    const cx = Math.min(Math.max(x, rect.left), rect.right);
+    const cy = Math.min(Math.max(y, rect.top), rect.bottom);
+    const dist = Math.hypot(x - cx, y - cy);
+    if (dist < nearestDist) {
+      nearest = slot;
+      nearestDist = dist;
+    }
+  });
+  return nearest;
+}
+
+function clearSlotHighlight() {
+  drops.querySelectorAll(".drop.is-over").forEach((slot) => slot.classList.remove("is-over"));
+}
+
+function cleanupDrag() {
+  if (!drag) return;
+  try {
+    drag.card.releasePointerCapture(drag.pointerId);
+  } catch {
+    /* 指標已經放開 */
+  }
+  drag.card.classList.remove("is-lifting");
+  drag.ghost.remove();
+  drag = null;
+  clearSlotHighlight();
+  document.body.classList.remove("is-dragging");
+}
+
+function startDrag(card, event) {
+  if (drag || card.disabled) return;
+  event.preventDefault();
+  const rect = card.getBoundingClientRect();
+  const ghost = card.cloneNode(true);
+  ghost.classList.add("drag-ghost");
+  ghost.setAttribute("aria-hidden", "true");
+  ghost.tabIndex = -1;
+  ghost.style.width = `${rect.width}px`;
+  ghost.style.height = `${rect.height}px`;
+  ghost.style.left = `${rect.left}px`;
+  ghost.style.top = `${rect.top}px`;
+  document.body.appendChild(ghost);
+  card.classList.add("is-lifting");
+  document.body.classList.add("is-dragging");
+  drag = {
+    id: card.dataset.id,
+    card,
+    ghost,
+    dx: event.clientX - rect.left,
+    dy: event.clientY - rect.top,
+    startX: event.clientX,
+    startY: event.clientY,
+    pointerId: event.pointerId,
+    moved: false,
+  };
+  try {
+    card.setPointerCapture(event.pointerId);
+  } catch {
+    /* 仍然靠 document 上的指標事件完成拖放 */
+  }
+}
+
+function onAdaptPointerMove(event) {
+  if (!drag || event.pointerId !== drag.pointerId) return;
+  if (event.cancelable) event.preventDefault();
+  if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 16) drag.moved = true;
+  drag.ghost.style.left = `${event.clientX - drag.dx}px`;
+  drag.ghost.style.top = `${event.clientY - drag.dy}px`;
+  const hit = slotFromPoint(event.clientX, event.clientY);
+  drops.querySelectorAll(".drop").forEach((slot) => {
+    slot.classList.toggle("is-over", slot === hit);
+  });
+}
+
+function armSkipClick() {
+  skipClick = true;
+  window.clearTimeout(skipTimer);
+  skipTimer = window.setTimeout(() => {
+    skipClick = false;
+  }, 250);
+}
+
+function onAdaptPointerUp(event) {
+  if (!drag || event.pointerId !== drag.pointerId) return;
+  const id = drag.id;
+  const moved = drag.moved || Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 16;
+  const slot = moved ? slotFromPoint(event.clientX, event.clientY) : null;
+  cleanupDrag();
+  armSkipClick();
+  if (!moved) {
+    toggleSelect(id);
+    return;
+  }
+  state.selectedCard = null;
+  if (slot) tryPlace(id, slot.dataset.slot);
+  else paintAdapt();
+}
+
 function restart() {
   if (state.step !== "title" && state.step !== "done") {
     const ok = window.confirm("要重新開始這次探究嗎？");
@@ -744,6 +1174,7 @@ document.getElementById("coach").addEventListener("click", (event) => {
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
+  stopVoice();
   if (!answer.value.trim()) {
     answer.setCustomValidity("先寫下一句，再交給評分。");
     answer.reportValidity();
@@ -757,6 +1188,53 @@ form.addEventListener("submit", (event) => {
 });
 
 answer.addEventListener("input", () => answer.setCustomValidity(""));
+voiceBtn.addEventListener("click", () => {
+  if (!recognition || voiceBtn.disabled) return;
+  if (voiceListening) stopVoice();
+  else startVoice();
+});
+adaptOpen.addEventListener("click", openAdapt);
+adaptClose.addEventListener("click", closeAdapt);
+drops.addEventListener("click", (event) => {
+  const slot = event.target.closest(".drop");
+  if (!slot || !state.selectedCard || state.lock || !state.adaptOn) return;
+  if (event.target.closest(".drag-card")) return;
+  tryPlace(state.selectedCard, slot.dataset.slot);
+});
+drops.addEventListener("keydown", (event) => {
+  if (!state.adaptOn || state.lock) return;
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const slot = event.target.closest(".drop");
+  if (!slot || event.target.closest(".drag-card") || !state.selectedCard) return;
+  event.preventDefault();
+  tryPlace(state.selectedCard, slot.dataset.slot);
+});
+document.addEventListener("keydown", (event) => {
+  if (!state.adaptOn || state.lock) return;
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const card = event.target.closest(".drag-card");
+  if (!card) return;
+  event.preventDefault();
+  toggleSelect(card.dataset.id);
+});
+document.addEventListener("pointerdown", (event) => {
+  const card = event.target.closest(".drag-card");
+  if (!card || state.step !== "explain" || !state.adaptOn || state.lock) return;
+  if (event.button > 0) return;
+  startDrag(card, event);
+}, { passive: false });
+document.addEventListener("pointermove", onAdaptPointerMove, { passive: false });
+document.addEventListener("pointerup", onAdaptPointerUp);
+document.addEventListener("pointercancel", onAdaptPointerUp);
+document.addEventListener("click", (event) => {
+  if (!skipClick) return;
+  skipClick = false;
+  window.clearTimeout(skipTimer);
+  if (event.target.closest(".drag-card, .drop")) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+}, true);
 sunBtn.addEventListener("click", heatLand);
 air.addEventListener("pointerdown", onPointerDown);
 air.addEventListener("pointermove", onPointerMove);
@@ -775,6 +1253,7 @@ muteBtn.addEventListener("click", () => {
 });
 
 new ResizeObserver(fitCanvas).observe(sky);
+setupVoice();
 syncMute();
 fitCanvas();
 enter("title");
