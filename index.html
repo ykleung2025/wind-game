@@ -1,722 +1,187 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html lang="zh-Hant-HK">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>風之工程師 V3 - 海陸風大解密</title>
-<style>
-  /* 基礎設定，針對 iPad 觸控優化 */
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
-  body {
-    margin: 0; padding: 0; width: 100vw; height: 100vh;
-    font-family: "PingFang HK", "Microsoft JhengHei", sans-serif;
-    background-color: #87CEEB; overflow: hidden;
-    display: flex; justify-content: center; align-items: center;
-    touch-action: none; /* 防止 iPad 滑動時觸發網頁滾動 */
-  }
-  #game-container {
-    width: 100%; height: 100%; max-width: 1200px;
-    position: relative; background: linear-gradient(to bottom, #8ecae6, #e0fbfc);
-    overflow: hidden;
-  }
-
-  /* 頂部狀態列 */
-  #header {
-    position: absolute; top: 0; left: 0; width: 100%; height: 60px; 
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 0 20px; background: rgba(255,255,255,0.6); backdrop-filter: blur(5px);
-    font-size: 20px; font-weight: bold; color: #023047; z-index: 100;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  }
-
-  /* 場景繪製 */
-  .scene { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
-  .sun { 
-    position: absolute; top: 10%; left: 15%; width: 80px; height: 80px; 
-    background: #FFD166; border-radius: 50%; box-shadow: 0 0 30px #FFD166; 
-    transition: all 0.5s; cursor: pointer; z-index: 50;
-    display: flex; justify-content: center; align-items: center; font-size: 30px;
-  }
-  .sun.hot { background: #FF5722; box-shadow: 0 0 60px #FF5722; transform: scale(1.1); }
-  .land { position: absolute; bottom: 0; left: 0; width: 55%; height: 45%; background: #8BC34A; border-top-right-radius: 80% 100%; pointer-events: none; }
-  .ocean { position: absolute; bottom: 0; right: 0; width: 50%; height: 35%; background: #4FC3F7; border-top-left-radius: 80% 100%; pointer-events: none; }
-  .lighthouse { position: absolute; bottom: 42%; left: 48%; width: 30px; height: 80px; background: white; border: 2px solid #ccc; border-radius: 5px 5px 0 0; z-index: 5; pointer-events: none; }
-  .lighthouse::before { content:''; position: absolute; top: -15px; left: -5px; width: 40px; height: 15px; background: #FFB703; border-radius: 50% 50% 0 0; }
-  .tree { position: absolute; bottom: 40%; width: 40px; height: 60px; background: #2E7D32; border-radius: 50% 50% 20% 20%; transition: transform 0.2s; z-index: 5; pointer-events: none; }
-  .tree::after { content:''; position: absolute; bottom: -15px; left: 15px; width: 10px; height: 15px; background: #795548; }
-  .tree.t1 { left: 10%; }
-  .tree.t2 { left: 22%; height: 70px; bottom: 41%; }
-  .tree.wind { animation: sway 0.4s infinite alternate; }
-  @keyframes sway { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
-
-  /* 提示文字框 */
-  .dialog-box {
-    position: absolute; top: 12%; left: 50%; transform: translateX(-50%);
-    background: rgba(255,255,255,0.95); padding: 15px 30px; border-radius: 20px;
-    font-size: 22px; font-weight: bold; color: #023047; box-shadow: 0 6px 15px rgba(0,0,0,0.15);
-    text-align: center; z-index: 200; transition: all 0.3s; border: 3px solid #219EBC;
-    min-width: 300px; pointer-events: none; /* 唔好阻擋點擊 */
-  }
-
-  /* 按鈕 */
-  .btn {
-    padding: 15px 40px; font-size: 24px; font-weight: bold; border: none; border-radius: 30px;
-    background: #FB8500; color: white; box-shadow: 0 6px #d67000; cursor: pointer;
-    transition: transform 0.1s, box-shadow 0.1s; outline: none; pointer-events: auto;
-  }
-  .btn:active { transform: translateY(4px); box-shadow: 0 2px #d67000; }
-  .btn-blue { background: #219EBC; box-shadow: 0 6px #176b80; }
-  .btn-blue:active { box-shadow: 0 2px #176b80; }
-  .btn-green { background: #4CAF50; box-shadow: 0 6px #388E3C; }
-  .btn-green:active { box-shadow: 0 2px #388E3C; }
-
-  /* 階段控制 */
-  .stage { display: none; position: absolute; width: 100%; height: 100%; z-index: 20; pointer-events: none; }
-  .stage.active { display: block; }
-
-  /* 階段一 UI */
-  #stage1 .controls { position: absolute; bottom: 15%; left: 25%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 150; pointer-events: auto; }
-  
-  /* 階段二 UI (Canvas 畫線) */
-  #draw-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; pointer-events: auto; touch-action: none; }
-  .pressure-icon {
-    position: absolute; width: 60px; height: 60px; border-radius: 50%; display: flex;
-    justify-content: center; align-items: center; font-size: 36px; font-weight: bold;
-    color: white; opacity: 0; transition: opacity 0.5s; z-index: 101; pointer-events: none;
-  }
-  .pressure-icon.low { background: #E63946; top: 35%; left: 20%; }
-  .pressure-icon.high { background: #023047; top: 60%; right: 15%; }
-
-  /* 階段三 UI */
-  #stage3 .quiz-panel {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    background: white; padding: 30px; border-radius: 25px; width: 90%; max-width: 850px;
-    box-shadow: 0 15px 40px rgba(0,0,0,0.3); z-index: 150; text-align: center;
-    display: none; flex-direction: column; gap: 20px; border: 5px solid #219EBC;
-    pointer-events: auto;
-  }
-  #stage3 .quiz-panel.active { display: flex; }
-  .quiz-text { font-size: 24px; line-height: 2.2; color: #333; text-align: left; }
-  .blank {
-    display: inline-block; min-width: 100px; padding: 5px 15px; margin: 0 5px;
-    border-bottom: 4px dashed #219EBC; color: #FB8500; font-weight: bold; text-align: center;
-    background: #e0fbfc; border-radius: 8px; cursor: pointer; transition: all 0.2s;
-  }
-  .blank.active { background: #FFD166; border-bottom-color: #FB8500; transform: scale(1.05); }
-  .blank.correct { background: #C8E6C9; color: #2E7D32; border-bottom-color: #2E7D32; border-bottom-style: solid; }
-  .blank.wrong { background: #FFCDD2; color: #B71C1C; border-bottom-color: #B71C1C; border-bottom-style: solid; }
-  
-  .options { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-top: 10px; }
-  .option-btn {
-    padding: 15px 30px; font-size: 22px; background: #f8f9fa; border: 3px solid #adb5bd;
-    border-radius: 15px; color: #495057; font-weight: bold; cursor: pointer;
-    transition: all 0.2s; box-shadow: 0 4px #adb5bd;
-  }
-  .option-btn:active { transform: translateY(2px); box-shadow: 0 2px #adb5bd; }
-  .option-btn:hover { border-color: #219EBC; color: #219EBC; }
-
-  /* 粒子層 */
-  #particle-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>風之工程師 — 海陸風大解密</title>
+  <meta name="description" content="給學生自己查出風怎樣形成的探究遊戲。寫出過程，90 分或以上過關。">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%23147a96'/%3E%3Cpath d='M10 36c8-10 14-10 22 0s14 10 22 0' fill='none' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/game.css">
 </head>
 <body>
-
-<div id="game-container">
-  <!-- 背景場景 -->
-  <div class="scene">
-    <div class="sun" id="sun">☀️</div>
-    <div class="land"></div>
-    <div class="ocean"></div>
-    <div class="lighthouse"></div>
-    <div class="tree t1" id="tree1"></div>
-    <div class="tree t2" id="tree2"></div>
-  </div>
-
-  <!-- 頂部狀態 -->
-  <div id="header">
-    <div>🌍 風之工程師 V3</div>
-    <div id="status-text">任務：點擊太陽加熱陸地</div>
-  </div>
-
-  <!-- 粒子層 -->
-  <canvas id="particle-canvas"></canvas>
-
-  <!-- 提示對話框 -->
-  <div class="dialog-box" id="dialog">點擊左上角的太陽，讓陸地受熱！</div>
-
-  <!-- 階段一：熱空氣 -->
-  <div class="stage active" id="stage1">
-    <div class="controls" id="stage1-controls" style="display: none;">
-      <button class="btn" id="btn-expand">膨脹</button>
-      <button class="btn btn-blue" id="btn-contract">收縮</button>
-    </div>
-  </div>
-
-  <!-- 階段二：冷空氣補充 (畫線互動) -->
-  <div class="stage" id="stage2">
-    <canvas id="draw-canvas"></canvas>
-    <div class="pressure-icon low" id="low-press">－</div>
-    <div class="pressure-icon high" id="high-press">＋</div>
-  </div>
-
-  <!-- 階段三：文字填空 -->
-  <div class="stage" id="stage3">
-    <div class="quiz-panel" id="quiz-panel">
-      <div class="quiz-text">
-        日間，在太陽的照射下，陸地上的空氣因受熱
-        <span class="blank" id="blank1">?</span> 而
-        <span class="blank" id="blank2">?</span>。<br>
-        海洋上較冷的空氣會流向陸地，補充了
-        <span class="blank" id="blank3">?</span> 的空氣。<br>
-        這樣，空氣流動便形成風。
+  <div id="app">
+    <header>
+      <div class="brand">
+        <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true">
+          <circle cx="18" cy="18" r="18" fill="#147a96"/>
+          <path d="M6 20c5-6 8-6 13 0s8 6 13 0" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+        <div>
+          <strong>風之工程師</strong>
+          <small>海陸風探究</small>
+        </div>
       </div>
-      <div class="options" id="options-container">
-        <!-- JS 動態生成選項 -->
+      <div class="progress" id="progress"></div>
+      <div class="tools">
+        <button type="button" class="ghost" id="mute" aria-pressed="false">聲音開</button>
+        <button type="button" class="ghost" id="restart">重來</button>
       </div>
-      <button class="btn btn-green" id="btn-check" style="margin-top: 10px; display: none;">確認答案</button>
+    </header>
+
+    <div id="sky">
+      <svg id="world" viewBox="0 0 1200 680" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <defs>
+          <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#79c0ea"/>
+            <stop offset="0.55" stop-color="#d9f1fb"/>
+            <stop offset="0.78" stop-color="#fbe3bc"/>
+            <stop offset="1" stop-color="#f6d3a4"/>
+          </linearGradient>
+          <linearGradient id="seaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#5ec4dd"/>
+            <stop offset="0.45" stop-color="#1f8eae"/>
+            <stop offset="1" stop-color="#0f5f86"/>
+          </linearGradient>
+          <linearGradient id="landGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#b7d56a"/>
+            <stop offset="1" stop-color="#5f9a3c"/>
+          </linearGradient>
+          <linearGradient id="heatGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffb15a" stop-opacity="0"/>
+            <stop offset="1" stop-color="#ff7a3c" stop-opacity="0.45"/>
+          </linearGradient>
+          <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#0e2433" flood-opacity="0.18"/>
+          </filter>
+        </defs>
+
+        <rect width="1200" height="680" fill="url(#skyGrad)"/>
+
+        <g class="sun" transform="translate(168 128)">
+          <g class="rays">
+            <rect x="-3" y="-102" width="6" height="28" rx="3" fill="#ffd56a"/>
+            <rect x="-3" y="-102" width="6" height="28" rx="3" fill="#ffd56a" transform="rotate(30)"/>
+            <rect x="-3" y="-102" width="6" height="28" rx="3" fill="#ffd56a" transform="rotate(60)"/>
+            <rect x="-3" y="-102" width="6" height="28" rx="3" fill="#ffd56a" transform="rotate(90)"/>
+            <rect x="-3" y="-102" width="6" height="28" rx="3" fill="#ffd56a" transform="rotate(120)"/>
+            <rect x="-3" y="-102" width="6" height="28" rx="3" fill="#ffd56a" transform="rotate(150)"/>
+            <rect x="-3" y="-102" width="6" height="28" rx="3" fill="#ffd56a" transform="rotate(180)"/>
+            <rect x="-3" y="-102" width="6" height="28" rx="3" fill="#ffd56a" transform="rotate(210)"/>
+            <rect x="-3" y="-102" width="6" height="28" rx="3" fill="#ffd56a" transform="rotate(240)"/>
+            <rect x="-3" y="-102" width="6" height="28" rx="3" fill="#ffd56a" transform="rotate(270)"/>
+            <rect x="-3" y="-102" width="6" height="28" rx="3" fill="#ffd56a" transform="rotate(300)"/>
+            <rect x="-3" y="-102" width="6" height="28" rx="3" fill="#ffd56a" transform="rotate(330)"/>
+          </g>
+          <circle class="halo" r="78"/>
+          <circle class="sun-core" r="48"/>
+          <circle class="sun-inner" r="22"/>
+        </g>
+
+        <g transform="translate(430 86)"><g class="cloud c1"><ellipse cx="0" cy="12" rx="52" ry="22"/><ellipse cx="34" cy="2" rx="36" ry="24"/><ellipse cx="-34" cy="8" rx="30" ry="18"/></g></g>
+        <g transform="translate(760 124)"><g class="cloud c2"><ellipse cx="0" cy="10" rx="44" ry="18"/><ellipse cx="28" cy="0" rx="28" ry="18"/><ellipse cx="-26" cy="6" rx="24" ry="14"/></g></g>
+        <g transform="translate(980 78)"><g class="cloud c3"><ellipse cx="0" cy="8" rx="36" ry="14"/><ellipse cx="22" cy="0" rx="20" ry="12"/></g></g>
+
+        <path class="gull" d="M0 10 Q10 0 20 10 M20 10 Q30 0 40 10" fill="none" stroke="#234055" stroke-width="3" stroke-linecap="round"/>
+        <path class="gull late" d="M0 10 Q8 2 16 10 M16 10 Q24 2 32 10" fill="none" stroke="#234055" stroke-width="2.4" stroke-linecap="round"/>
+
+        <path d="M0 430 C180 360 320 390 470 430 L470 470 L0 470 Z" fill="#d7ebc4"/>
+        <ellipse cx="980" cy="448" rx="110" ry="16" fill="#b7d39a"/>
+
+        <path d="M520 455 C700 410 880 490 1200 445 L1200 680 L520 680 Z" fill="url(#seaGrad)"/>
+        <ellipse cx="860" cy="560" rx="120" ry="12" fill="#ffffff" opacity="0.18"/>
+
+        <g class="waves">
+          <path d="M560 520 Q640 500 730 520 T900 520 T1080 520" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="4" stroke-linecap="round"/>
+          <path d="M600 575 Q700 555 820 575 T1040 575" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="4" stroke-linecap="round"/>
+          <path d="M640 630 Q760 612 900 632 T1120 628" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="4" stroke-linecap="round"/>
+        </g>
+
+        <g transform="translate(980 520)">
+          <g class="boat">
+            <path d="M0 24 Q48 52 108 24 L92 24 Q52 40 14 24 Z" fill="#f7f3ea"/>
+            <path d="M12 24 Q52 40 92 24 L80 24 Q52 34 22 24 Z" fill="#e08a45"/>
+            <rect x="50" y="4" width="4" height="22" rx="1" fill="#6d4a32"/>
+            <path d="M54 6 L84 20 L54 20 Z" fill="#fffaf3"/>
+          </g>
+        </g>
+
+        <path d="M0 520 C170 445 310 480 455 525 C545 558 620 615 710 680 L0 680 Z" fill="url(#landGrad)"/>
+        <path class="heat-wash" d="M40 560 C180 500 320 530 470 590 C390 640 200 670 40 680 Z" fill="url(#heatGrad)"/>
+        <path d="M390 560 C500 530 590 590 690 680 L430 680 C430 640 390 600 360 590 Z" fill="#f0d7ad"/>
+        <path d="M430 575 C520 555 590 610 670 675" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="4" stroke-linecap="round"/>
+
+        <g filter="url(#soft)">
+          <g transform="translate(78 455)">
+            <g class="tree">
+              <rect x="18" y="58" width="10" height="42" rx="3" fill="#6d4a32"/>
+              <circle cx="23" cy="48" r="28" fill="#2f7d46"/>
+              <circle cx="4" cy="58" r="16" fill="#3f9456"/>
+              <circle cx="40" cy="60" r="15" fill="#246b3d"/>
+            </g>
+          </g>
+          <g transform="translate(196 470)">
+            <g class="tree b">
+              <rect x="16" y="50" width="9" height="36" rx="3" fill="#6d4a32"/>
+              <circle cx="20" cy="42" r="24" fill="#348752"/>
+              <circle cx="4" cy="50" r="13" fill="#49a062"/>
+            </g>
+          </g>
+          <g transform="translate(300 488)">
+            <path d="M-4 28 L34 4 L74 28 Z" fill="#c4533d"/>
+            <rect x="4" y="28" width="62" height="36" fill="#f7f1e6"/>
+            <rect x="28" y="42" width="14" height="22" fill="#6d4a32"/>
+            <rect x="12" y="36" width="10" height="10" fill="#f4d35e"/>
+            <rect x="48" y="36" width="10" height="10" fill="#f4d35e"/>
+          </g>
+        </g>
+
+        <g transform="translate(500 390)">
+          <polygon class="beam" points="36,28 210,0 210,70" fill="rgba(255,214,120,.38)"/>
+          <polygon points="10,168 22,36 50,36 62,168" fill="#f7f4ee"/>
+          <polygon points="16,96 24,70 48,70 56,96" fill="#e25b45"/>
+          <polygon points="16,132 24,112 48,112 56,132" fill="#e25b45"/>
+          <rect x="16" y="28" width="40" height="20" rx="2" fill="#f4d35e"/>
+          <circle class="lantern-glow" cx="36" cy="38" r="7" fill="#fff6d4"/>
+          <path d="M12 28 H60 L52 12 H20 Z" fill="#c4473a"/>
+          <rect x="30" y="138" width="12" height="22" fill="#6d4a32"/>
+        </g>
+
+        <g fill="#6f9a45">
+          <ellipse cx="70" cy="620" rx="16" ry="6"/>
+          <ellipse cx="140" cy="640" rx="12" ry="5"/>
+          <ellipse cx="250" cy="650" rx="18" ry="6"/>
+        </g>
+      </svg>
+
+      <canvas id="air"></canvas>
+      <button type="button" id="sun-btn" aria-label="加熱陸地"></button>
+      <div class="tag" id="tag-land">陸地</div>
+      <div class="tag" id="tag-sea">海洋</div>
+      <div class="badge low" id="badge-low"><small>陸地</small>低氣壓</div>
+      <div class="badge high" id="badge-high"><small>海洋</small>高氣壓</div>
     </div>
+
+    <section id="coach">
+      <p class="kicker" id="kicker"></p>
+      <h2 id="prompt" tabindex="-1"></h2>
+      <p class="lead" id="lead"></p>
+      <p id="feedback" role="status"></p>
+      <div id="choices" class="choices"></div>
+      <div id="order" hidden></div>
+      <form id="answer-form" hidden>
+        <label for="answer">你的句子</label>
+        <textarea id="answer" maxlength="160" placeholder="例如：空氣受熱之後……"></textarea>
+        <p class="fine">90 分或以上過關。句子只在這部裝置評分，不會上傳。</p>
+        <button class="primary" type="submit">交給 AI 評分</button>
+        <div id="result"></div>
+        <p id="scaffold" hidden></p>
+      </form>
+      <div id="actions"></div>
+    </section>
   </div>
-
-</div>
-
-<script>
-/* 
-  V3 修正重點：
-  1. 修正音效初始化時機 (解決 iOS Safari 卡死問題)。
-  2. 改用 Pointer Events (pointerdown, pointermove, pointerup) 取代 touch/mouse 混合。
-  3. 強制設定 canvas 寬高與 devicePixelRatio 匹配，解決 Retina 螢幕點擊位置偏移。
-  4. 簡化部分 DOM 結構與 z-index 層級，確保按鈕一定可以被點擊。
-*/
-
-// --- 音效產生器 (安全版本) ---
-let audioCtx = null;
-function playSound(type) {
-  // 如果沒有 AudioContext，嘗試初始化
-  if (!audioCtx) {
-    try {
-      window.AudioContext = window.AudioContext || window.webkitAudioContext;
-      audioCtx = new AudioContext();
-    } catch (e) {
-      console.log("瀏覽器不支援音效");
-      return;
-    }
-  }
-  // 如果被瀏覽器暫停，嘗試恢復
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-
-  try {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    
-    if (type === 'click') {
-      osc.type = 'sine'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-      osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-    } else if (type === 'success') {
-      osc.type = 'triangle'; 
-      osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.2);
-      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-      osc.start(); osc.stop(audioCtx.currentTime + 0.3);
-    } else if (type === 'error') {
-      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-      osc.start(); osc.stop(audioCtx.currentTime + 0.2);
-    }
-  } catch(e) { console.log("音效播放失敗", e); }
-}
-
-// --- 全局狀態 ---
-const state = {
-  stage: 1,
-  sunHot: false,
-  particles: [],
-  animId: null,
-  selectedAnswers: { blank1: null, blank2: null, blank3: null },
-  activeBlank: 'blank1'
-};
-
-// --- DOM 元素 ---
-const sun = document.getElementById('sun');
-const dialog = document.getElementById('dialog');
-const statusText = document.getElementById('status-text');
-const btnExpand = document.getElementById('btn-expand');
-const btnContract = document.getElementById('btn-contract');
-const stage1 = document.getElementById('stage1');
-const stage2 = document.getElementById('stage2');
-const stage3 = document.getElementById('stage3');
-const stage1Controls = document.getElementById('stage1-controls');
-const drawCanvas = document.getElementById('draw-canvas');
-const ctxDraw = drawCanvas.getContext('2d');
-const particleCanvas = document.getElementById('particle-canvas');
-const ctxPart = particleCanvas.getContext('2d');
-const lowPress = document.getElementById('low-press');
-const highPress = document.getElementById('high-press');
-const trees = [document.getElementById('tree1'), document.getElementById('tree2')];
-const quizPanel = document.getElementById('quiz-panel');
-const optionsContainer = document.getElementById('options-container');
-const btnCheck = document.getElementById('btn-check');
-
-// --- 初始化 Canvas (解決 Retina 螢幕問題) ---
-function resizeCanvas() {
-  const dpr = window.devicePixelRatio || 1;
-  const rect = document.getElementById('game-container').getBoundingClientRect();
-  
-  // 粒子 Canvas
-  particleCanvas.width = rect.width * dpr;
-  particleCanvas.height = rect.height * dpr;
-  ctxPart.scale(dpr, dpr);
-  
-  // 畫線 Canvas
-  drawCanvas.width = rect.width * dpr;
-  drawCanvas.height = rect.height * dpr;
-  ctxDraw.scale(dpr, dpr);
-  
-  // 如果已經有粒子，重新繪製
-  if (state.particles.length > 0) drawParticles();
-}
-window.addEventListener('resize', resizeCanvas);
-window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 200));
-resizeCanvas();
-
-// --- 粒子系統 ---
-function createParticles() {
-  state.particles = [];
-  const rect = document.getElementById('game-container').getBoundingClientRect();
-  const startX = rect.width * 0.25; 
-  const startY = rect.height * 0.6;  
-  
-  for (let i = 0; i < 35; i++) {
-    let x = startX + (Math.random() - 0.5) * 80;
-    let y = startY + (Math.random() - 0.5) * 60;
-    state.particles.push({
-      x: x, y: y,
-      targetX: x, targetY: y,
-      radius: 6,
-      color: '#FF5722',
-      vx: 0, vy: 0,
-      isMoving: false
-    });
-  }
-}
-
-function drawParticles() {
-  const dpr = window.devicePixelRatio || 1;
-  ctxPart.clearRect(0, 0, particleCanvas.width / dpr, particleCanvas.height / dpr);
-  
-  state.particles.forEach(p => {
-    ctxPart.beginPath();
-    ctxPart.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-    ctxPart.fillStyle = p.color;
-    ctxPart.fill();
-  });
-}
-
-function animateParticles() {
-  let needsRedraw = false;
-  state.particles.forEach(p => {
-    if (p.isMoving) {
-      // 緩動移動
-      p.x += (p.targetX - p.x) * 0.08;
-      p.y += (p.targetY - p.y) * 0.08;
-      
-      if (Math.abs(p.targetX - p.x) > 0.5 || Math.abs(p.targetY - p.y) > 0.5) {
-        needsRedraw = true;
-      } else {
-        p.x = p.targetX;
-        p.y = p.targetY;
-        p.isMoving = false;
-      }
-    }
-  });
-  
-  if (needsRedraw) {
-    drawParticles();
-    state.animId = requestAnimationFrame(animateParticles);
-  } else {
-    drawParticles();
-  }
-}
-
-// --- 階段一邏輯 ---
-sun.addEventListener('pointerdown', (e) => {
-  e.preventDefault(); // 防止雙擊縮放
-  if (state.stage !== 1 || state.sunHot) return;
-  
-  playSound('click');
-  state.sunHot = true;
-  sun.classList.add('hot');
-  dialog.innerText = '陸地受熱了！空氣會怎樣呢？';
-  statusText.innerText = '任務：選擇空氣的變化';
-  stage1Controls.style.display = 'flex';
-
-  // 粒子震動效果 (模擬受熱)
-  state.particles.forEach(p => {
-    p.targetX = p.x + (Math.random() - 0.5) * 30;
-    p.targetY = p.y + (Math.random() - 0.5) * 30;
-    p.isMoving = true;
-  });
-  cancelAnimationFrame(state.animId);
-  animateParticles();
-});
-
-btnExpand.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  if (!state.sunHot) return;
-  playSound('success');
-  stage1Controls.style.display = 'none';
-  dialog.innerText = '空氣受熱膨脹，粒子距離拉開，整體體積變大！';
-  statusText.innerText = '觀察：熱空氣上升中';
-  
-  // 動畫：粒子距離拉開並整體上升
-  state.particles.forEach(p => {
-    let dx = p.x - (window.innerWidth * 0.25);
-    let dy = p.y - (window.innerHeight * 0.6);
-    let dist = Math.sqrt(dx*dx + dy*dy) || 1;
-    
-    // 目標位置：向外擴散，並向上移動
-    p.targetX = p.x + (dx / dist) * (80 + Math.random() * 60);
-    p.targetY = p.y + (dy / dist) * (80 + Math.random() * 60) - 300;
-    p.isMoving = true;
-  });
-  
-  cancelAnimationFrame(state.animId);
-  animateParticles();
-  
-  // 確保粒子顏色變淡(上升)
-  setTimeout(() => {
-    state.particles.forEach(p => p.color = 'rgba(255, 87, 34, 0.3)');
-    drawParticles();
-  }, 800);
-
-  // 進入下一階段
-  setTimeout(startStage2, 2000);
-});
-
-btnContract.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  playSound('error');
-  dialog.innerText = '不對喔！空氣受熱時，粒子會拉開距離膨脹，再試一次！';
-  btnContract.style.transform = 'translateX(5px)';
-  setTimeout(() => btnContract.style.transform = 'translateX(-5px)', 100);
-  setTimeout(() => btnContract.style.transform = 'translateX(0)', 200);
-});
-
-
-// --- 階段二邏輯 (Canvas 畫線) ---
-let isDrawing = false;
-let startX = 0, startY = 0;
-let currentLine = null;
-
-function startStage2() {
-  stage1.classList.remove('active');
-  stage2.classList.add('active');
-  dialog.innerText = '熱空氣上升了，陸地變空！請用手指從海洋向左劃，引導冷空氣補充。';
-  statusText.innerText = '任務：引導冷空氣';
-  
-  lowPress.style.opacity = '1';
-  highPress.style.opacity = '1';
-  
-  // 清空粒子畫布
-  state.particles = [];
-  ctxPart.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
-
-  // 綁定 Pointer Events (兼容 iPad 觸控與滑鼠)
-  drawCanvas.addEventListener('pointerdown', onPointerDown);
-  drawCanvas.addEventListener('pointermove', onPointerMove);
-  drawCanvas.addEventListener('pointerup', onPointerUp);
-  drawCanvas.addEventListener('pointercancel', onPointerUp);
-}
-
-function getPos(e) {
-  const rect = drawCanvas.getBoundingClientRect();
-  return { 
-    x: e.clientX - rect.left, 
-    y: e.clientY - rect.top 
-  };
-}
-
-function onPointerDown(e) {
-  e.preventDefault();
-  const pos = getPos(e);
-  // 必須從右側 (海洋) 開始劃
-  if (pos.x > window.innerWidth * 0.5) {
-    isDrawing = true;
-    startX = pos.x;
-    startY = pos.y;
-    currentLine = { startX, startY, endX: startX, endY: startY };
-    drawLine();
-  }
-}
-
-function onPointerMove(e) {
-  if (!isDrawing) return;
-  e.preventDefault();
-  const pos = getPos(e);
-  currentLine.endX = pos.x;
-  currentLine.endY = pos.y;
-  drawLine();
-}
-
-function onPointerUp(e) {
-  if (!isDrawing) return;
-  isDrawing = false;
-  const pos = getPos(e);
-  
-  // 判斷成功條件：向左劃動超過 150px，且結束位置在左半邊
-  if (pos.x < startX - 150 && pos.x < window.innerWidth * 0.45) {
-    playSound('success');
-    // 成功！
-    removePointerEvents();
-    ctxDraw.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-    dialog.innerText = '冷空氣從高氣壓（海洋）流向低氣壓（陸地）補充！';
-    successStage2();
-  } else {
-    // 失敗，清除線條
-    playSound('error');
-    ctxDraw.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-    currentLine = null;
-    dialog.innerText = '要從海洋（右邊）向左劃向陸地（左邊）才對喔！';
-  }
-}
-
-function drawLine() {
-  const dpr = window.devicePixelRatio || 1;
-  ctxDraw.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
-  if (!currentLine) return;
-  
-  ctxDraw.beginPath();
-  ctxDraw.moveTo(currentLine.startX, currentLine.startY);
-  ctxDraw.lineTo(currentLine.endX, currentLine.endY);
-  ctxDraw.strokeStyle = 'rgba(0, 180, 216, 0.8)';
-  ctxDraw.lineWidth = 15;
-  ctxDraw.lineCap = 'round';
-  ctxDraw.stroke();
-  
-  // 加個箭頭
-  let angle = Math.atan2(currentLine.endY - currentLine.startY, currentLine.endX - currentLine.startX);
-  let arrowX = currentLine.endX - 20 * Math.cos(angle);
-  let arrowY = currentLine.endY - 20 * Math.sin(angle);
-  ctxDraw.beginPath();
-  ctxDraw.moveTo(currentLine.endX, currentLine.endY);
-  ctxDraw.lineTo(arrowX - 10 * Math.sin(angle), arrowY + 10 * Math.cos(angle));
-  ctxDraw.lineTo(arrowX + 10 * Math.sin(angle), arrowY - 10 * Math.cos(angle));
-  ctxDraw.closePath();
-  ctxDraw.fillStyle = 'rgba(0, 180, 216, 1)';
-  ctxDraw.fill();
-}
-
-function removePointerEvents() {
-  drawCanvas.removeEventListener('pointerdown', onPointerDown);
-  drawCanvas.removeEventListener('pointermove', onPointerMove);
-  drawCanvas.removeEventListener('pointerup', onPointerUp);
-  drawCanvas.removeEventListener('pointercancel', onPointerUp);
-}
-
-function successStage2() {
-  lowPress.style.opacity = '0';
-  highPress.style.opacity = '0';
-  
-  // 生成冷空氣粒子從右向左移動
-  const rect = document.getElementById('game-container').getBoundingClientRect();
-  for (let i = 0; i < 25; i++) {
-    let startX = rect.width * 0.8 + (Math.random() - 0.5) * 100;
-    let startY = rect.height * 0.5 + (Math.random() - 0.5) * 100;
-    let targetX = rect.width * 0.25 + (Math.random() - 0.5) * 100;
-    let targetY = rect.height * 0.6 + (Math.random() - 0.5) * 100;
-    
-    let p = {
-      x: startX, y: startY, targetX: targetX, targetY: targetY,
-      radius: 6, color: '#00B4D8'
-    };
-    
-    // 使用動畫 (簡單 setTimeout 控制延遲)
-    let delay = i * 40;
-    setTimeout(() => {
-      state.particles.push(p);
-      animateColdParticle(p);
-    }, delay);
-  }
-
-  // 樹木搖擺 (風的視覺回饋)
-  setTimeout(() => {
-    trees.forEach(t => t.classList.add('wind'));
-  }, 500);
-
-  // 進入階段三
-  setTimeout(() => {
-    dialog.style.opacity = '0';
-    startStage3();
-  }, 2500);
-}
-
-function animateColdParticle(p) {
-  let startTime = performance.now();
-  let duration = 800;
-  let startX = p.x, startY = p.y;
-  
-  function update() {
-    let time = performance.now() - startTime;
-    let progress = Math.min(time / duration, 1);
-    let ease = 1 - Math.pow(1 - progress, 3);
-    
-    p.x = startX + (p.targetX - startX) * ease;
-    p.y = startY + (p.targetY - startY) * ease;
-    
-    drawParticles(); // 重繪所有粒子
-    
-    if (progress < 1) {
-      requestAnimationFrame(update);
-    }
-  }
-  requestAnimationFrame(update);
-}
-
-
-// --- 階段三邏輯 (文字填空) ---
-function startStage3() {
-  stage2.classList.remove('active');
-  stage3.classList.add('active');
-  statusText.innerText = '最終任務：完成科學填空';
-  quizPanel.classList.add('active');
-  dialog.style.opacity = '0';
-
-  // 選項池
-  const options = ['膨脹', '收縮', '上升', '下沉'];
-  
-  optionsContainer.innerHTML = '';
-  options.forEach(opt => {
-    let btn = document.createElement('button');
-    btn.className = 'option-btn';
-    btn.innerText = opt;
-    
-    btn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      if (state.activeBlank) {
-        playSound('click');
-        // 填入文字
-        let blankEl = document.getElementById(state.activeBlank);
-        blankEl.innerText = opt;
-        blankEl.classList.add('active');
-        state.selectedAnswers[state.activeBlank] = opt;
-        
-        // 尋找下一個未填的空格
-        let nextBlank = null;
-        if (!state.selectedAnswers.blank1) nextBlank = 'blank1';
-        else if (!state.selectedAnswers.blank2) nextBlank = 'blank2';
-        else if (!state.selectedAnswers.blank3) nextBlank = 'blank3';
-        
-        if (nextBlank) {
-          setActiveBlank(nextBlank);
-        } else {
-          setActiveBlank(null);
-        }
-
-        // 檢查是否全部填完
-        if (state.selectedAnswers.blank1 && state.selectedAnswers.blank2 && state.selectedAnswers.blank3) {
-          btnCheck.style.display = 'inline-block';
-        } else {
-          btnCheck.style.display = 'none';
-        }
-      }
-    });
-    optionsContainer.appendChild(btn);
-  });
-
-  function setActiveBlank(id) {
-    ['blank1', 'blank2', 'blank3'].forEach(b => {
-      let el = document.getElementById(b);
-      if (b === id) el.classList.add('active');
-      else el.classList.remove('active');
-    });
-    state.activeBlank = id;
-  }
-
-  // 點擊空格可以重新選擇
-  ['blank1', 'blank2', 'blank3'].forEach(id => {
-    document.getElementById(id).addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      // 清除該格答案
-      e.target.innerText = '?';
-      e.target.classList.remove('correct', 'wrong', 'active');
-      state.selectedAnswers[id] = null;
-      setActiveBlank(id);
-      btnCheck.style.display = 'none';
-    });
-  });
-
-  setActiveBlank('blank1');
-
-  // 確認答案 (移除舊的監聽器避免重複)
-  const newBtnCheck = btnCheck.cloneNode(true);
-  btnCheck.parentNode.replaceChild(newBtnCheck, btnCheck);
-  
-  newBtnCheck.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    let correctAnswers = {
-      blank1: '膨脹',
-      blank2: '上升',
-      blank3: '上升'
-    };
-
-    let allCorrect = true;
-    for (let key in correctAnswers) {
-      let el = document.getElementById(key);
-      if (state.selectedAnswers[key] === correctAnswers[key]) {
-        el.classList.add('correct');
-        el.classList.remove('wrong');
-      } else {
-        el.classList.add('wrong');
-        el.classList.remove('correct');
-        allCorrect = false;
-      }
-    }
-
-    if (allCorrect) {
-      playSound('success');
-      dialog.style.opacity = '1';
-      dialog.innerText = '太棒了！你成功製造了風！🌬️';
-      dialog.style.background = '#C8E6C9';
-      dialog.style.color = '#2E7D32';
-      dialog.style.border = '3px solid #4CAF50';
-      
-      quizPanel.style.display = 'none';
-      statusText.innerText = '任務完成！🌟';
-      
-      sun.classList.remove('hot');
-      trees.forEach(t => t.classList.add('wind'));
-    } else {
-      playSound('error');
-      dialog.style.opacity = '1';
-      dialog.innerText = '有些答案不對喔，想想空氣受熱後會怎樣？';
-      dialog.style.background = '#FFCDD2';
-      dialog.style.color = '#B71C1C';
-      dialog.style.border = '3px solid #E53935';
-      
-      for (let key in correctAnswers) {
-        if (state.selectedAnswers[key] !== correctAnswers[key]) {
-          let el = document.getElementById(key);
-          el.style.transform = 'translateX(5px)';
-          setTimeout(() => el.style.transform = 'translateX(-5px)', 100);
-          setTimeout(() => el.style.transform = 'translateX(0)', 200);
-        }
-      }
-    }
-  });
-}
-
-// 初始化遊戲
-window.addEventListener('load', () => {
-  createParticles();
-  drawParticles();
-});
-</script>
+  <script type="module" src="./js/game.js"></script>
 </body>
 </html>
