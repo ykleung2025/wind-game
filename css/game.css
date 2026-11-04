@@ -370,6 +370,18 @@ h2 {
   background: #fff1ea;
 }
 
+#adapt-open {
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.45;
+  text-align: center;
+}
+
+#adapt-open span {
+  display: inline-block;
+  white-space: nowrap;
+}
+
 #adapt { display: grid; gap: 10px; justify-items: start; }
 
 #drops {
